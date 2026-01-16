@@ -8,7 +8,12 @@ import { importFromTrelloDocs } from './imports.docs';
 import { JsonFileValidator } from './validators/json-file.validator';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
+import { Throttle } from '@nestjs/throttler';
 
+@Throttle({
+  short: { limit: 2, ttl: 1000 },
+  long: { limit: 2, ttl: 60000 }
+})
 @ApiCookieAuth()
 @ApiTags('Imports')
 @UseGuards(JwtAuthGuard)

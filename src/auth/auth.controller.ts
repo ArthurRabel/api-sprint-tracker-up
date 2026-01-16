@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiCookieAuth } from '@nestjs/swagger';
 import { AuthProvider } from '@prisma/client';
 import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from '@/auth/auth.service';
 import {
@@ -47,6 +48,10 @@ import {
   LdapLoginDocs,
 } from './auth.docs';
 
+@Throttle({
+  short: { limit: 2, ttl: 1000 },
+  long: { limit: 5, ttl: 60000 }
+})
 @ApiTags('Authentication and Authorization')
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
