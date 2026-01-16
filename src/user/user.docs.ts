@@ -5,31 +5,31 @@ import {
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
 
-export function GetProfileDocs() {
+export function GetUserDocs() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Get user profile',
-      description: 'Returns the authenticated user profile information.',
+      summary: 'Get user',
+      description: 'Returns the authenticated user information.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
-      description: 'Profile loaded successfully',
+      description: 'User loaded successfully',
     }),
-    ApiNotFoundResponse({ description: 'Profile not found' }),
+    ApiNotFoundResponse({ description: 'User not found' }),
   );
 }
 
-export function UpdateProfileDocs() {
+export function UpdateUserDocs() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Update user profile',
-      description: 'Updates the authenticated user profile information.',
+      summary: 'Update user',
+      description: 'Updates the authenticated user information.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
-      description: 'Profile updated successfully',
+      description: 'User updated successfully',
     }),
-    ApiNotFoundResponse({ description: 'Profile not found' }),
+    ApiNotFoundResponse({ description: 'User not found' }),
   );
 }
 
@@ -43,7 +43,7 @@ export function DeleteAccountDocs() {
       status: HttpStatus.OK,
       description: 'Account deleted successfully',
     }),
-    ApiNotFoundResponse({ description: 'Profile not found' }),
+    ApiNotFoundResponse({ description: 'User not found' }),
   );
 }
 
@@ -57,6 +57,6 @@ export function GetNotificationsDocs() {
       status: HttpStatus.OK,
       description: 'Notifications loaded successfully',
     }),
-    ApiNotFoundResponse({ description: 'Profile not found' }),
+    ApiNotFoundResponse({ description: 'User not found' }),
   );
 }

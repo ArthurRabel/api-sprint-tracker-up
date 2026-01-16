@@ -1,35 +1,69 @@
 import { HttpException, Injectable, NotFoundException, HttpStatus } from '@nestjs/common';
-import { AuthProvider } from '@prisma/client';
+import { AuthProvider, User, Role } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
-import { updateProfileDto } from './dto/update-profile.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
-export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+export class UserService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
-  async getProfile(userId: string) {
-    const profile = await this.prisma.user.findUnique({
+  async createUser(
+    data: {
+      email: string;
+      name: string;
+      userName?: string;
+      providerId?: string;
+      passwordHash?: string;
+    },
+    provider: AuthProvider,
+  ): Promise<User> {
+    const { name, email, providerId, passwordHash, userName } = data;
+    const userData = {
+      email,
+      name,
+      userName: userName || email.split('@')[0],
+      passwordHash: passwordHash || null,
+      providerId: provider === AuthProvider.LOCAL ? null : providerId || null,
+      role: Role.MEMBER,
+      authProvider: provider,
+    };
+
+    const user = await this.prisma.user.create({
+      data: userData,
+    });
+
+    this.eventEmitter.emit('user.created', user);
+
+    return user;
+  }
+
+  async getUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!profile) {
-      throw new Error('User not found');
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
     const userData = {
-      id: profile.id,
-      name: profile.name,
-      userName: profile.userName,
-      email: profile.email,
-      authProvider: profile.authProvider,
+      id: user.id,
+      name: user.name,
+      userName: user.userName,
+      email: user.email,
+      authProvider: user.authProvider,
     };
 
     return userData;
   }
 
-  async updateProfile(userId: string, data: updateProfileDto) {
+  async updateUser(userId: string, data: UpdateUserDto) {
     if (data.email) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -43,16 +77,16 @@ export class ProfileService {
       }
     }
 
-    const updatedProfile = await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data,
     });
 
-    if (!updatedProfile) {
-      throw new Error('Error updating profile');
+    if (!updatedUser) {
+      throw new Error('Error updating user');
     }
 
-    return updatedProfile;
+    return updatedUser;
   }
 
   async deleteAccount(userId: string) {

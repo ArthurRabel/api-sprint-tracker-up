@@ -10,6 +10,7 @@ import { JwtStrategy } from '@/auth/strategy/jwt.strategy';
 import { MicrosoftStrategy } from '@/auth/strategy/microsoft.strategy';
 import { EmailModule } from '@/email/email.module';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { UserModule } from '@/user/user.module';
 
 export const OAUTH_STRATEGIES_TOKEN = 'OAUTH_STRATEGIES';
 
@@ -55,6 +56,7 @@ export class AuthModule {
         PassportModule,
         PrismaModule,
         EmailModule,
+        UserModule,
         JwtModule.registerAsync({
           useFactory: getJwtConfig,
           inject: [ConfigService],

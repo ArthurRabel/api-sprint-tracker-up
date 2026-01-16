@@ -10,7 +10,7 @@ import { BoardModule } from '@/board/board.module';
 import { EventsModule } from '@/events/events.module';
 import { HealthModule } from '@/health/health.module';
 import { ListModule } from '@/list/list.module';
-import { ProfileModule } from '@/me/me.module';
+import { UserModule } from '@/user/user.module';
 import { LoggingMiddleware } from '@/middleware/logging.middleware';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { TaskModule } from '@/task/task.module';
@@ -54,7 +54,7 @@ import { AppController } from './app.controller';
     PrismaModule,
     AuthModule.register(),
     EventsModule,
-    ProfileModule,
+    UserModule,
     BoardModule,
     ListModule,
     TaskModule,

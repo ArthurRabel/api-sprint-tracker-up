@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User, Role, AuthProvider } from '@prisma/client';
+import { User, AuthProvider } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { Client } from 'ldapts';
 
@@ -18,6 +18,7 @@ import { ChangePasswordDto, SignInDto, SignUpDto, VerifyResetCodeDto } from '@/a
 import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
 import { EmailService } from '@/email/email.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { UserService } from '@/user/user.service';
 
 import { AccessTokenPayload } from './interface/jwt';
 
@@ -36,6 +37,7 @@ export class AuthService {
     private configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly userService: UserService,
   ) {
     this.userBaseDn = this.configService.getOrThrow<string>('LDAP_USER_BASE_DN');
     this.ldapUrl = this.configService.getOrThrow<string>('LDAP_URL');
@@ -68,31 +70,6 @@ export class AuthService {
     });
   }
 
-  private async createUser(
-    data: {
-      email: string;
-      name: string;
-      providerId?: string;
-      password?: string;
-    },
-    provider: AuthProvider,
-  ): Promise<User> {
-    const { name, email, providerId, password } = data;
-    const userData = {
-      email,
-      name,
-      userName: data.email.split('@')[0],
-      passwordHash: provider === AuthProvider.LOCAL ? data.password! : null,
-      providerId: provider === AuthProvider.LOCAL ? null : data.providerId!,
-      role: Role.MEMBER,
-      authProvider: provider,
-    };
-
-    return this.prisma.user.create({
-      data: userData,
-    });
-  }
-
   async signUp(dto: SignUpDto): Promise<{ accessToken: string }> {
     const existingUserByEmail = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -110,7 +87,15 @@ export class AuthService {
 
     const hashedPassword = await this.hashPassword(dto.password);
 
-    const user = await this.createUser({ ...dto, password: hashedPassword }, AuthProvider.LOCAL);
+    const user = await this.userService.createUser(
+      { 
+        email: dto.email, 
+        name: dto.name, 
+        userName: dto.userName,
+        passwordHash: hashedPassword 
+      }, 
+      AuthProvider.LOCAL,
+    );
     return this.generateJwt(user);
   }
 
@@ -143,7 +128,10 @@ export class AuthService {
     });
 
     if (!user) {
-      user = await this.createUser({ email, name, providerId }, provider);
+      user = await this.userService.createUser(
+        { email, name, providerId },
+        provider,
+      );
     }
 
     return this.generateJwt(user);
