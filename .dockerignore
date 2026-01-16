@@ -1,0 +1,7 @@
+node_modules
+.git
+*.log
+*.md
+**/*.spec.ts
+.vscode
+.env
