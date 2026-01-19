@@ -3,9 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { apiReference } from '@scalar/nestjs-api-reference';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import helmet from 'helmet';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { AppModule } from './app.module';
 
@@ -49,17 +51,6 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-          'script-src': ["'self'", 'https://cdn.socket.io'],
-        },
-      },
-    }),
-  );
-
   app.enableCors({
     origin: CORS_ORIGIN,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -70,43 +61,63 @@ async function bootstrap() {
     type: VersioningType.URI,
   });
 
+  const docsPath = path.join(process.cwd(), 'INTRODUCTION.md');
+  let description = 'Sprint Tracker API documentation by Arthur Rabelo, fork from BayArea.';
+
+  try {
+    description = fs.readFileSync(docsPath, 'utf8');
+  } catch {
+    logger.warn('file INTRODUCTION.md not found. Using default description for docs.');
+  }
+
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Sprint Tracker API - IESB')
-    .setDescription('Sprint Tracker API documentation by BayArea - IESB')
+    .setTitle('API docs - Sprint Tracker Up')
+    .setDescription(description)
     .addCookieAuth('sprinttacker-session')
-    .setExternalDoc('Additional documentation', 'https://github.com/fabrica-bayarea/Sprint-Tracker')
-    .setContact('BayArea', '', 'nde.ads@iesb.br')
+    .setExternalDoc('Additional documentation', 'https://github.com/ArthurRabel/api-sprint-tracker-up')
+    .setContact('Arthur Rabelo', '', 'arthur.rabelo@outlook.com')
     .setLicense(
       'License GPL-3.0',
-      'https://github.com/fabrica-bayarea/Sprint-Tracker?tab=GPL-3.0-1-ov-file',
+      'https://github.com/ArthurRabel/api-sprint-tracker-up/blob/main/LICENSE.md',
     )
     .addTag(
       'Authentication and Authorization',
-      'Authentication and authorization via "sprinttacker-session" cookie (JWT).',
+      'Endpoints for login, logout, token generation, password management, and session validation using JWT in cookies.'
     )
-    .addTag('User Profile', 'Operations related to user profile and management.')
-    .addTag('Boards', 'Board management (creation, listing, updating and removal).')
+    .addTag(
+      'User',
+      'User profile management, registration, update, and retrieval of user information.'
+    )
+    .addTag(
+      'Boards',
+      'Create, list, update, and delete boards. Manage board settings and members.'
+    )
     .addTag(
       'Lists',
-      'List management within boards (creation, ordering, updating and removal).',
+      'Manage lists within boards: create, order, update, and remove lists.'
     )
     .addTag(
       'Tasks',
-      'Task management within lists (creation, movement, updating, removal and assignment).',
+      'CRUD operations for tasks, move between lists, assign users, update status, and delete.'
+    )
+    .addTag(
+      'Imports',
+      'Import data into the system, including bulk operations and validations.'
     )
     .setVersion('1.0')
-    .addServer(API_GLOBAL_PREFIX)
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 
   SwaggerModule.setup('docs', app, document, {
     customSiteTitle: 'Sprint Tacker API - IESB',
-    customfavIcon: 'https://www.iesb.br/content/themes/iesb-chleba-themosis/favicon.png',
     customCss: `
-      .swagger-ui .topbar { 
-        background: transparent linear-gradient(96deg, #CC0000 0%, #F00B54 100%) 0% 0% no-repeat padding-box; 
+      .renderedMarkdown h1, .renderedMarkdown h2{
+        font-size: 1.1rem;
       }
+      .renderedMarkdown h3{
+        font-size: 0.9rem;
+        }
     `,
     swaggerOptions: {
       persistAuthorization: true,
@@ -114,22 +125,36 @@ async function bootstrap() {
     },
   });
 
+  app.use(
+    'scalar',
+    apiReference({
+      content: document,
+      theme: 'none',
+      layout: 'modern',
+      pageTitle: 'API docs - Sprint Tracker Up',
+      showDeveloperTools: 'never',
+      darkMode: true,
+      hideClientButton: true,
+      cdn: '/assets/scalar.min.js',
+    }),
+  );
+
   await app.listen(PORT);
   logger.log(`Application is running on: http://localhost:${PORT}`);
 
   if (NODE_ENV === 'production') {
     process.on('SIGINT', (): void => {
-      logger.log('Recebido SIGINT. Desligando...');
+      logger.log('Received SIGINT. Shutting down...');
       void app.close().then(() => {
-        logger.log('Aplicação desligada.');
+        logger.log('Application shut down.');
         process.exit(0);
       });
     });
 
     process.on('SIGTERM', (): void => {
-      logger.log('Recebido SIGTERM. Desligando...');
+      logger.log('Received SIGTERM. Shutting down...');
       void app.close().then(() => {
-        logger.log('Aplicação desligada.');
+        logger.log('Application shut down.');
         process.exit(0);
       });
     });
