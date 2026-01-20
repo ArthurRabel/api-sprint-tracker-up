@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { User, AuthProvider } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { Client } from 'ldapts';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import 'dotenv/config';
 import { ChangePasswordDto, SignInDto, SignUpDto, VerifyResetCodeDto } from '@/auth/dto';
@@ -35,6 +36,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private eventEmitter: EventEmitter2,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     private readonly userService: UserService,
@@ -96,6 +98,9 @@ export class AuthService {
       }, 
       AuthProvider.LOCAL,
     );
+
+    this.eventEmitter.emit('user.registered', user);
+
     return this.generateJwt(user);
   }
 
@@ -158,7 +163,10 @@ export class AuthService {
       },
     });
 
-    await this.emailService.sendForgotPasswordEmail(email, code);
+    this.eventEmitter.emit('user.forgotPassword', { 
+      email: user.email, 
+      resetToken: code 
+    });
   }
 
   async verifyResetCode(verifyResetCodeDto: VerifyResetCodeDto): Promise<string> {
@@ -258,6 +266,8 @@ export class AuthService {
       where: { id },
       data: { passwordHash: hashedNewPassword },
     });
+
+    this.eventEmitter.emit('user.changePassword', user);
   }
 
   async authenticateLdap(

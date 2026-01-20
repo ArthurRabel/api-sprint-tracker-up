@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
@@ -38,6 +39,10 @@ import { AppController } from './app.controller';
           limit: 60,
         },
       ]
+    }),
+    EventEmitterModule.forRoot({
+      wildcard: false,
+      ignoreErrors: false,
     }),
     ConfigModule.forRoot({
       isGlobal: true,

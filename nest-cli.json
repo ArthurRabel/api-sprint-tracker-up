@@ -5,19 +5,9 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [
-      { "include": "email/**/*.html", "watch": true, "outDir": "dist/src" },
-      { "include": "assets/**/*", "watch": true, "outDir": "dist/src" }
+      { "include": "email/templates/**/*", "watchAssets": true },
+      { "include": "assets/**/*", "watchAssets": true }
     ],
-    "webpack": false,
     "tsConfigPath": "tsconfig.build.json"
-  },
-  "builder": {
-    "type": "tsc",
-    "options": {
-      "assets": [
-        { "include": "email/**/*.html", "watch": true, "outDir": "dist/src" },
-        { "include": "assets/**/*", "watch": true, "outDir": "dist/src" }
-      ]
-    }
   }
 }

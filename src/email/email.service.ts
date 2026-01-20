@@ -1,54 +1,49 @@
 import * as fs from 'fs';
 import * as path from 'path';
-
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import * as handlebars from 'handlebars';
+import { Injectable, Inject, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createTransport, Transporter } from 'nodemailer';
+import { Transporter } from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private transporter: Transporter;
   private readonly emailUser: string;
-  private readonly emailPass: string;
-  private readonly nodeEnv: string;
+  private readonly isProduction: boolean;
+  private readonly cdnBase: string;
 
-  constructor(private readonly configService: ConfigService) {
-    this.emailUser = this.configService.getOrThrow<string>('EMAIL');
-    this.emailPass = this.configService.getOrThrow<string>('PASS');
-    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-
-    try {
-      this.transporter = createTransport({
-        service: 'gmail',
-        auth: {
-          user: this.emailUser,
-          pass: this.emailPass,
-        },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(
-        'Error configuring email service. Please check credentials. ' + message,
-      );
-    }
-  }
-
-  getTransporter(): Transporter {
-    return this.transporter;
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject('EMAIL_TRANSPORTER') private readonly transporter: Transporter,
+  ) {
+    this.emailUser = this.configService.getOrThrow<string>('EMAIL_USER');
+    this.isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    this.cdnBase = this.configService.getOrThrow<string>('CDN_BASE_URL');
   }
 
   private loadTemplate(templateName: string): string {
-    const templateBaseDir = path.join(__dirname, 'templates');
-    const filePath = path.join(templateBaseDir, templateName);
+    const filePath = path.join(process.cwd(), 'dist', 'email', 'templates', templateName);
     try {
       return fs.readFileSync(filePath, 'utf8');
-    } catch {
-      throw new InternalServerErrorException('Error loading email template.');
+    } catch(erro) {
+      throw new InternalServerErrorException('Error loading email template.', erro);
+    }
+  }
+
+  private renderTemplate(templateName: string, context: Record<string, any>): string {
+    const source = this.loadTemplate(templateName);
+    try {
+      const tpl = handlebars.compile(source);
+      return tpl(context);
+    } catch(erro) {
+      throw new InternalServerErrorException('Error rendering email template.', erro);
     }
   }
 
   async sendForgotPasswordEmail(to: string, code: string): Promise<void> {
-    const html = this.loadTemplate('forgot-password.template.html').replace('{{code}}', code);
+    const html = this.renderTemplate('forgot-password.template.hbs', {
+      code,
+      BayareaLogoUrl: `${this.cdnBase}/bayarea-logo.png`,
+    });
 
     try {
       await this.transporter.sendMail({
@@ -56,28 +51,50 @@ export class EmailService {
         to,
         subject: 'Password Recovery',
         html,
-        attachments: [
-          {
-            filename: 'bayarea-logo.png',
-            path:
-              this.nodeEnv === 'production'
-                ? 'dist/src/assets/bayarea-logo.png'
-                : 'src/assets/bayarea-logo.png',
-            cid: 'bayarea-logo',
-          },
-          {
-            filename: 'iesb-logo.png',
-            path:
-              this.nodeEnv === 'production'
-                ? 'dist/src/assets/iesb-logo.png'
-                : 'src/assets/iesb-logo.png',
-            cid: 'iesb-logo',
-          },
-        ],
       });
     } catch (error) {
       throw new InternalServerErrorException(
         'Error sending recovery email. Details: ' + String(error),
+      );
+    }
+  }
+
+  async sendWelcomeEmail(to: string, name: string): Promise<void> {
+    const html = this.renderTemplate('welcome-user.template.hbs', {
+      name,
+      WelcomeGifUrl: `${this.cdnBase}/emails/welcome-animation.gif`,
+    });
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Sprint Tracker" <${this.emailUser}>`,
+        to,
+        subject: 'Welcome to Sprint Tracker!',
+        html,
+      });
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Error sending welcome email. Details: ' + String(error),
+      );
+    }
+  }
+
+  async sendPasswordChangedEmail(to: string, name: string): Promise<void> {
+    const html = this.renderTemplate('password-changed.template.hbs', {
+      name,
+      SecurityIconUrl: `${this.cdnBase}/emails/security-icon.png`,
+    });
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Sprint Tracker Support" <${this.emailUser}>`,
+        to,
+        subject: 'Password Changed Successfully',
+        html,
+      });
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Error sending password changed email. Details: ' + String(error),
       );
     }
   }
