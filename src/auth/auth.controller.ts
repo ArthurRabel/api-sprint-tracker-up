@@ -174,25 +174,24 @@ export class AuthController {
     @Req()
     req: {
       user: {
-        googleId: string;
+        providerId: string;
         email: string;
         name: string;
-        accessToken: string;
       };
     },
     @Res() res: Response,
   ) {
     try {
-      const { user } = req;
+      const { providerId, email, name } = req.user;
 
-      if (!user || !user.googleId || !user.email) {
+      if (!providerId || !email) {
         return res.redirect(`${this.frontendUrl}/auth/error?message=incomplete_google_data`);
       }
 
       const authResult = await this.authService.signInWithProvider(AuthProvider.GOOGLE, {
-        providerId: user.googleId,
-        email: user.email,
-        name: user.name,
+        providerId,
+        email,
+        name,
       });
 
       if (!authResult?.accessToken) {
@@ -221,25 +220,24 @@ export class AuthController {
     @Req()
     req: {
       user: {
-        microsoftId: string;
+        providerId: string;
         email: string;
         name: string;
-        access_token: string;
       };
     },
     @Res() res: Response,
   ) {
     try {
-      const { user } = req;
+      const { providerId, email, name } = req.user;
 
-      if (!user || !user.microsoftId || !user.email) {
+      if (!providerId || !email) {
         return res.redirect(`${this.frontendUrl}/auth/error?message=incomplete_microsoft_data`);
       }
 
       const authResult = await this.authService.signInWithProvider(AuthProvider.MICROSOFT, {
-        providerId: user.microsoftId,
-        email: user.email,
-        name: user.name,
+        providerId,
+        email,
+        name,
       });
 
       if (!authResult?.accessToken) {

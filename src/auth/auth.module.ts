@@ -8,7 +8,6 @@ import { AuthService } from '@/auth/auth.service';
 import { GoogleStrategy } from '@/auth/strategy/google.strategy';
 import { JwtStrategy } from '@/auth/strategy/jwt.strategy';
 import { MicrosoftStrategy } from '@/auth/strategy/microsoft.strategy';
-import { EmailModule } from '@/email/email.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { UserModule } from '@/user/user.module';
 
@@ -55,7 +54,6 @@ export class AuthModule {
       imports: [
         PassportModule,
         PrismaModule,
-        EmailModule,
         UserModule,
         JwtModule.registerAsync({
           useFactory: getJwtConfig,

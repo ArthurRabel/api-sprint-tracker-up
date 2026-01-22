@@ -36,7 +36,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
 
   validate(
     _req: Request,
-    accessToken: string,
+    _accessToken: string,
     _refreshToken: string,
     profile: MicrosoftProfile,
     done: VerifyCallback,
@@ -48,8 +48,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
     const user: ProviderUser = {
       providerId: profile.id,
       email: profile.emails[0].value,
-      name: profile.displayName,
-      accessToken,
+      name: profile.displayName
     };
 
     done(null, user);

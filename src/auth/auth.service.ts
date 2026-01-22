@@ -14,10 +14,8 @@ import * as argon2 from 'argon2';
 import { Client } from 'ldapts';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import 'dotenv/config';
 import { ChangePasswordDto, SignInDto, SignUpDto, VerifyResetCodeDto } from '@/auth/dto';
 import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
-import { EmailService } from '@/email/email.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UserService } from '@/user/user.service';
 
@@ -38,7 +36,6 @@ export class AuthService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
     private readonly jwtService: JwtService,
-    private readonly emailService: EmailService,
     private readonly userService: UserService,
   ) {
     this.userBaseDn = this.configService.getOrThrow<string>('LDAP_USER_BASE_DN');

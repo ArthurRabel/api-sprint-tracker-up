@@ -15,5 +15,4 @@ export interface ProviderUser {
   providerId: string;
   email: string;
   name: string;
-  accessToken: string;
 }
