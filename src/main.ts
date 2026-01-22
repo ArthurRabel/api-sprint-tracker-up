@@ -126,7 +126,7 @@ async function bootstrap() {
   });
 
   app.use(
-    'scalar',
+    '/scalar',
     apiReference({
       content: document,
       theme: 'none',
