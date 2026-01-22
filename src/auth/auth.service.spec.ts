@@ -5,9 +5,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient, AuthProvider, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { EmailService } from '@/email/email.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { UserService } from '@/user/user.service';
 
 import { AuthService } from './auth.service';
 import { SignUpDto, SignInDto, ChangePasswordDto, VerifyResetCodeDto } from './dto';
@@ -19,7 +20,8 @@ describe('AuthService', () => {
   let prisma: DeepMockProxy<PrismaService>;
   let configService: DeepMockProxy<ConfigService>;
   let jwtService: DeepMockProxy<JwtService>;
-  let emailService: DeepMockProxy<EmailService>;
+  let eventEmitter: DeepMockProxy<EventEmitter2>;
+  let userService: DeepMockProxy<UserService>;
 
   const mockUserId = '6217183c-bc01-4bca-8aa0-271b7f9761c5';
   const mockEmail = 'user@example.com';
@@ -52,7 +54,8 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
         { provide: JwtService, useValue: mockDeep<JwtService>() },
         { provide: ConfigService, useValue: mockDeep<ConfigService>() },
-        { provide: EmailService, useValue: mockDeep<EmailService>() },
+        { provide: EventEmitter2, useValue: mockDeep<EventEmitter2>() },
+        { provide: UserService, useValue: mockDeep<UserService>() },
       ],
     }).compile();
 
@@ -60,7 +63,8 @@ describe('AuthService', () => {
     prisma = module.get(PrismaService);
     jwtService = module.get(JwtService);
     configService = module.get(ConfigService);
-    emailService = module.get(EmailService);
+    eventEmitter = module.get(EventEmitter2);
+    userService = module.get(UserService);
 
     configService.getOrThrow.mockReturnValue('mock-value');
     jwtService.sign.mockReturnValue(mockAccessToken);
@@ -84,7 +88,7 @@ describe('AuthService', () => {
       });
 
       prisma.user.findUnique.mockResolvedValue(null);
-      prisma.user.create.mockResolvedValue(mockUser);
+      userService.createUser.mockResolvedValue(mockUser);
       (argon2.hash as jest.Mock).mockResolvedValue(mockHashedPassword);
 
       const result = await service.signUp(signUpDto);
@@ -93,7 +97,8 @@ describe('AuthService', () => {
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: signUpDto.email },
       });
-      expect(prisma.user.create).toHaveBeenCalled();
+      expect(userService.createUser).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith('user.registered', mockUser);
       expect(jwtService.sign).toHaveBeenCalled();
     });
 
@@ -104,7 +109,7 @@ describe('AuthService', () => {
       await expect(service.signUp(signUpDto)).rejects.toThrow(
         new ConflictException('Email already in use'),
       );
-      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(userService.createUser).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException if username already exists', async () => {
@@ -114,7 +119,7 @@ describe('AuthService', () => {
       await expect(service.signUp(signUpDto)).rejects.toThrow(
         new ConflictException('Username already in use'),
       );
-      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(userService.createUser).not.toHaveBeenCalled();
     });
   });
 
@@ -201,6 +206,7 @@ describe('AuthService', () => {
 
     it('should create new user and return token for new OAuth user', async () => {
       const newUser = createMockUser({
+        id: 'id',
         email: providerData.email,
         name: providerData.name,
         providerId: providerData.providerId,
@@ -209,7 +215,7 @@ describe('AuthService', () => {
       });
 
       prisma.user.findUnique.mockResolvedValue(null);
-      prisma.user.create.mockResolvedValue(newUser);
+      userService.createUser.mockResolvedValue(newUser);
 
       const result = await service.signInWithProvider(AuthProvider.GOOGLE, providerData);
 
@@ -217,7 +223,10 @@ describe('AuthService', () => {
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: providerData.email },
       });
-      expect(prisma.user.create).toHaveBeenCalled();
+      expect(userService.createUser).toHaveBeenCalledWith(
+        { email: providerData.email, name: providerData.name, providerId: providerData.providerId },
+        AuthProvider.GOOGLE,
+      );
     });
 
     it('should return token for existing OAuth user', async () => {
@@ -231,7 +240,7 @@ describe('AuthService', () => {
       const result = await service.signInWithProvider(AuthProvider.GOOGLE, providerData);
 
       expect(result).toEqual({ accessToken: mockAccessToken });
-      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(userService.createUser).not.toHaveBeenCalled();
     });
 
     it('should work with MICROSOFT provider', async () => {
@@ -241,18 +250,22 @@ describe('AuthService', () => {
       });
 
       prisma.user.findUnique.mockResolvedValue(null);
-      prisma.user.create.mockResolvedValue(newUser);
+      userService.createUser.mockResolvedValue(newUser);
 
       const result = await service.signInWithProvider(AuthProvider.MICROSOFT, providerData);
 
       expect(result).toEqual({ accessToken: mockAccessToken });
+      expect(userService.createUser).toHaveBeenCalledWith(
+        { email: providerData.email, name: providerData.name, providerId: providerData.providerId },
+        AuthProvider.MICROSOFT,
+      );
     });
   });
 
   describe('forgotPassword', () => {
     const forgotPasswordDto = { email: mockEmail };
 
-    it('should generate reset token and send email', async () => {
+    it('should generate reset token and emit event', async () => {
       const mockUser = createMockUser();
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.user.update.mockResolvedValue(mockUser);
@@ -269,9 +282,12 @@ describe('AuthService', () => {
           resetTokenExpiresAt: expect.any(Date),
         }),
       });
-      expect(emailService.sendForgotPasswordEmail).toHaveBeenCalledWith(
-        mockEmail,
-        expect.any(String),
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'user.forgotPassword',
+        expect.objectContaining({
+          email: mockEmail,
+          resetToken: expect.any(String),
+        }),
       );
     });
 
@@ -281,7 +297,7 @@ describe('AuthService', () => {
       await service.forgotPassword(forgotPasswordDto);
 
       expect(prisma.user.update).not.toHaveBeenCalled();
-      expect(emailService.sendForgotPasswordEmail).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -439,6 +455,7 @@ describe('AuthService', () => {
         where: { id: mockUserId },
         data: { passwordHash: 'new-hashed-password' },
       });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('user.changePassword', mockUser);
     });
 
     it('should throw BadRequestException if user not found', async () => {

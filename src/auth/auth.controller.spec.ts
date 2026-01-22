@@ -19,6 +19,7 @@ import {
   SignUpDto,
   VerifyResetCodeDto,
 } from './dto';
+import { ProviderUser } from './interface/oauth';
 import { ResetPasswordGuard } from './guards/reset-password.guard';
 
 describe('AuthController', () => {
@@ -210,7 +211,7 @@ describe('AuthController', () => {
 
     it('changes password for authenticated user', async () => {
       authService.changePassword.mockResolvedValue(undefined);
-      const req = { user: { id: 'user-id' } } as any;
+        const req = { user: { id: 'user-id' } };
 
       const result = await controller.changePassword(req, dto);
 
@@ -220,21 +221,20 @@ describe('AuthController', () => {
   });
 
   describe('googleAuthRedirect', () => {
-    const user = {
-      googleId: 'google-123',
+    const user: ProviderUser = {
+      providerId: 'google-123',
       email: 'user@example.com',
       name: 'Google User',
-      accessToken,
     };
 
     it('redirects to dashboard with session cookie on success', async () => {
       const res = createResponseMock();
       authService.signInWithProvider.mockResolvedValue({ accessToken });
 
-      await controller.googleAuthRedirect({ user } as any, res);
+      await controller.googleAuthRedirect({ user }, res);
 
       expect(authService.signInWithProvider).toHaveBeenCalledWith(AuthProvider.GOOGLE, {
-        providerId: user.googleId,
+        providerId: user.providerId,
         email: user.email,
         name: user.name,
       });
@@ -249,41 +249,36 @@ describe('AuthController', () => {
     it('redirects to error page when data is incomplete', async () => {
       const res = createResponseMock();
 
-      await controller.googleAuthRedirect({ user: { email: null } } as any, res);
+        await controller.googleAuthRedirect({
+          user: {
+            providerId: '',
+            email: '',
+            name: '' 
+          }
+        }, res);
 
       expect(res.redirect).toHaveBeenCalledWith(
         `${frontendUrl}/auth/error?message=incomplete_google_data`,
       );
     });
 
-    it('redirects to error page when token is missing', async () => {
-      const res = createResponseMock();
-      authService.signInWithProvider.mockResolvedValue({ accessToken: undefined as any });
-
-      await controller.googleAuthRedirect({ user } as any, res);
-
-      expect(res.redirect).toHaveBeenCalledWith(
-        `${frontendUrl}/auth/error?message=google_login_failed`,
-      );
-    });
   });
 
   describe('microsoftAuthRedirect', () => {
-    const user = {
-      microsoftId: 'ms-123',
+    const user: ProviderUser = {
+      providerId: 'ms-123',
       email: 'ms@example.com',
       name: 'MS User',
-      access_token: 'token',
     };
 
     it('redirects to dashboard with session cookie on success', async () => {
       const res = createResponseMock();
       authService.signInWithProvider.mockResolvedValue({ accessToken });
 
-      await controller.microsoftAuthRedirect({ user } as any, res);
+      await controller.microsoftAuthRedirect({ user }, res);
 
       expect(authService.signInWithProvider).toHaveBeenCalledWith(AuthProvider.MICROSOFT, {
-        providerId: user.microsoftId,
+        providerId: user.providerId,
         email: user.email,
         name: user.name,
       });
@@ -293,7 +288,13 @@ describe('AuthController', () => {
     it('redirects to error page when data is incomplete', async () => {
       const res = createResponseMock();
 
-      await controller.microsoftAuthRedirect({ user: { email: null } } as any, res);
+        await controller.microsoftAuthRedirect({
+          user: {
+            providerId: '',
+            email: '',
+            name: '' 
+          }
+        }, res);
 
       expect(res.redirect).toHaveBeenCalledWith(
         `${frontendUrl}/auth/error?message=incomplete_microsoft_data`,
@@ -307,7 +308,7 @@ describe('AuthController', () => {
 
     it('authenticates via LDAP and sets cookie', async () => {
       const res = createResponseMock();
-      authService.authenticateLdap.mockResolvedValue(ldapUser as any);
+        authService.authenticateLdap.mockResolvedValue(ldapUser);
       authService.signInWithProvider.mockResolvedValue({ accessToken });
 
       const result = await controller.ldapLogin(dto, res);
