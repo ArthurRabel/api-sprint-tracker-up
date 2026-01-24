@@ -17,7 +17,7 @@ export class ListService {
     return this.prisma.$transaction(async (tx) => {
       if (dto.position === undefined || dto.position === null) {
         const lastList = await tx.list.findFirst({
-          where: { boardId: dto[0].boardId },
+          where: { boardId: dto.boardId },
           orderBy: { position: 'desc' },
           select: { position: true },
         });

@@ -1,9 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import {
-  ApiOperation,
-  ApiBody,
-  ApiConsumes,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiBody, ApiConsumes } from '@nestjs/swagger';
 
 export function importFromTrelloDocs() {
   return applyDecorators(
@@ -15,10 +11,10 @@ export function importFromTrelloDocs() {
         properties: {
           file: {
             type: 'string',
-            format: 'binary'
-          }
-        }
-      }
-    })
-  )
+            format: 'binary',
+          },
+        },
+      },
+    }),
+  );
 }

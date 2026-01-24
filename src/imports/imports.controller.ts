@@ -1,18 +1,28 @@
-import { Controller, HttpStatus, Param, ParseFilePipeBuilder, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ImportsService } from './imports.service';
-import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
-import { CreateBoardDocs } from '@/board/board.docs';
+import {
+  Controller,
+  HttpStatus,
+  Param,
+  ParseFilePipeBuilder,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { importFromTrelloDocs } from './imports.docs';
-import { JsonFileValidator } from './validators/json-file.validator';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+
+import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
-import { Throttle } from '@nestjs/throttler';
+
+import { importFromTrelloDocs } from './imports.docs';
+import { ImportsService } from './imports.service';
+import { JsonFileValidator } from './validators/json-file.validator';
 
 @Throttle({
   short: { limit: 2, ttl: 1000 },
-  long: { limit: 2, ttl: 60000 }
+  long: { limit: 2, ttl: 60000 },
 })
 @ApiCookieAuth()
 @ApiTags('Imports')
@@ -21,29 +31,27 @@ import { Throttle } from '@nestjs/throttler';
 export class ImportsController {
   constructor(private readonly importsService: ImportsService) {}
 
-  @CreateBoardDocs()
+  @importFromTrelloDocs()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
-  @importFromTrelloDocs()
   @Post('trello/:boardId')
-  importFromTrello(
+  async importFromTrello(
     @CurrentUser() user: AuthenticatedUser,
     @Param('boardId') boardId: string,
-    @UploadedFile(new ParseFilePipeBuilder()
-      .addValidator(new JsonFileValidator())
-      .addMaxSizeValidator({
-        maxSize: 1024 * 1024 * 5
-      })
-      .build({
-        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY
-      }),
-  ) file: Express.Multer.File) {
-    this.importsService.importFromTrello(
-      user.id,
-      boardId,
-      file,
-    );
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addValidator(new JsonFileValidator())
+        .addMaxSizeValidator({
+          maxSize: 1024 * 1024 * 5,
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        }),
+    )
+    file: Express.Multer.File,
+  ) {
+    await this.importsService.importFromTrello(user.id, boardId, file);
 
-    return "Import started";
+    return 'Import started';
   }
 }

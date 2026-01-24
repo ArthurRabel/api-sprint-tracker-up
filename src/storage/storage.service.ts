@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
+
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class StorageService {
@@ -38,7 +39,7 @@ export class StorageService {
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: key,
-    })
+    });
 
     const response = await this.client.send(command);
     return response.Body as Readable;

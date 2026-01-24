@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
+
 import { EmailService } from './email.service';
 
 interface WelcomeEmailData {
@@ -44,7 +45,7 @@ export class EmailProcessor extends WorkerHost {
         await this.processPasswordChangedEmail(job as Job<PasswordChangedEmailData>);
         break;
       default:
-        this.logger.warn(`Unknown job type: ${job.name}`);
+        this.logger.warn(`Unknown job type: ${String(job.name)}`);
     }
   }
 

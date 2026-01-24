@@ -1,26 +1,44 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
-import { StorageService } from '@/storage/storage.service';
+import { EventEmitter } from 'events';
+import { Readable, Transform } from 'stream';
 
-import { parser } from 'stream-json';
-import { streamArray } from 'stream-json/streamers/StreamArray';
-import { pick } from 'stream-json/filters/Pick';
-import { chain } from 'stream-chain';
-import { ConfigService } from '@nestjs/config';
-import { Readable } from 'stream';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { ListService } from '@/list/list.service';
-import { CreateListDto } from '@/list/dto/create-list.dto';
-import { CreateTaskDto } from '@/task/dto/create-task.dto';
+import { ConfigService } from '@nestjs/config';
+import { Job } from 'bullmq';
+import * as Chain from 'stream-chain';
+import { parser } from 'stream-json';
+import { pick } from 'stream-json/filters/Pick';
+import { streamArray } from 'stream-json/streamers/StreamArray';
+
 import { TaskStatus } from '@/common/enums/task-status.enum';
+import { CreateListDto } from '@/list/dto/create-list.dto';
+import { ListService } from '@/list/list.service';
+import { StorageService } from '@/storage/storage.service';
+import { CreateTaskDto } from '@/task/dto/create-task.dto';
 import { TaskService } from '@/task/task.service';
+
+interface TrelloList {
+  id: string;
+  name: string;
+  closed: boolean;
+}
 
 interface TrelloCard {
   id: string;
+  idList: string;
   name: string;
   desc: string;
-  idList: string;
+  due: string | null;
   closed: boolean;
+}
+
+interface StreamData<T> {
+  value: T;
+}
+
+interface StreamPipeline extends EventEmitter {
+  pause(): void;
+  resume(): void;
 }
 
 interface ImportFileData {
@@ -53,7 +71,7 @@ export class ImportsProcessor extends WorkerHost {
     const bucket = this.configService.getOrThrow<string>('S3_BUCKET_NAME');
 
     this.logger.log(`[Worker] 1/2: Processing lists...`);
-    
+
     const listStreamS3 = await this.storageService.getFileStream(bucket, fileKey);
     await this.processLists(listStreamS3, boardId);
 
@@ -66,89 +84,108 @@ export class ImportsProcessor extends WorkerHost {
   }
 
   private async processLists(inputStream: Readable, boardId: string) {
-    return new Promise((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => {
       let batch: CreateListDto[] = [];
-      
-      const pipeline = chain([
-        inputStream,
-        parser(),
-        pick({ filter: 'lists' }), 
-        streamArray(),
-      ]);
 
-      pipeline.on('data', async (data) => {
+      const chainElements = [inputStream, parser(), pick({ filter: 'lists' }), streamArray()];
+      const pipeline = Chain.chain(chainElements) as unknown as StreamPipeline;
+
+      const handleData = (data: StreamData<TrelloList>): void => {
         const list: CreateListDto = {
           boardId: boardId,
-          externalId: data.value.id as string,
-          title: data.value.name as string,
-          isArchived: data.value.closed as boolean,
+          externalId: data.value.id,
+          title: data.value.name,
+          isArchived: data.value.closed,
         };
-        
+
         batch.push(list);
 
         if (batch.length >= 100) {
           pipeline.pause();
-          await this.listService.createMultipleSameBoard(batch);
+          const currentBatch = [...batch];
           batch = [];
-          pipeline.resume();
-        }
-      });
 
-      pipeline.on('end', async () => {
+          this.listService
+            .createMultipleSameBoard(currentBatch)
+            .then(() => {
+              pipeline.resume();
+            })
+            .catch((error: Error) => {
+              this.logger.error(`[Worker] Error creating lists: ${error.message}`);
+              reject(new Error(`Error creating lists: ${error.message}`));
+            });
+        }
+      };
+
+      const handleEnd = (): void => {
         if (batch.length > 0) {
-          await this.listService.createMultipleSameBoard(batch);
-        } 
-        this.logger.log(`[Worker] All lists processed successfully`);
-        resolve(true);
-      });
-      
-      pipeline.on('error', (error) => {
+          this.listService
+            .createMultipleSameBoard(batch)
+            .then(() => {
+              this.logger.log(`[Worker] All lists processed successfully`);
+              resolve(true);
+            })
+            .catch((error: Error) => {
+              this.logger.error(`[Worker] Error creating final lists: ${error.message}`);
+              reject(new Error(`Error creating final lists: ${error.message}`));
+            });
+        } else {
+          this.logger.log(`[Worker] All lists processed successfully`);
+          resolve(true);
+        }
+      };
+
+      const handleError = (error: Error): void => {
         this.logger.error(`[Worker] Error processing lists: ${error.message}`);
-        reject(error);
-      });
+        reject(new Error(`Error processing lists: ${error.message}`));
+      };
+
+      pipeline.on('data', handleData);
+      pipeline.on('end', handleEnd);
+      pipeline.on('error', handleError);
     });
   }
 
   private async buildListIdMap(boardId: string): Promise<Map<string, string>> {
-    const lists = await this.listService.findListsForMapping(boardId); 
-    
+    const lists = await this.listService.findListsForMapping(boardId);
+
     const map = new Map<string, string>();
-    lists.forEach(list => {
+    lists.forEach((list) => {
       if (list.externalId) {
         map.set(list.externalId, list.id);
       }
     });
     return map;
   }
-    
+
   private async processTasks(inputStream: Readable, boardId: string, userId: string) {
-    return new Promise(async (resolve, reject) => {
-      this.logger.log(`[Worker] Building list ID map...`);
-      const listIdMap = await this.buildListIdMap(boardId);
-      this.logger.log(`[Worker] List ID map built with ${listIdMap.size} lists`);
-      
+    const listIdMap = await this.buildListIdMap(boardId);
+    this.logger.log(`[Worker] Building list ID map...`);
+    this.logger.log(`[Worker] List ID map built with ${listIdMap.size} lists`);
+
+    return new Promise<boolean>((resolve, reject) => {
       const tasksByList = new Map<string, CreateTaskDto[]>();
 
-      const pipeline = chain([
+      const pipeline = Chain.chain([
         inputStream,
         parser(),
         pick({ filter: 'cards' }),
         streamArray(),
-      ]);
+      ]) as unknown as Transform;
 
-      pipeline.on('data', async (data) => {
-        const mappedListId = listIdMap.get(data.value.idList as string);
+      const handleData = (data: StreamData<TrelloCard>): void => {
+        const mappedListId = listIdMap.get(data.value.idList);
         if (!mappedListId) {
           return;
         }
 
         const task: CreateTaskDto = {
           listId: mappedListId,
-          externalId: data.value.id as string,
-          title: data.value.name as string,
+          externalId: data.value.id,
+          title: data.value.name,
           status: data.value.due ? TaskStatus.TODO : TaskStatus.DONE,
-          description: data.value.desc as string,
-          isArchived: data.value.closed as boolean,
+          description: data.value.desc,
+          isArchived: data.value.closed,
         };
 
         if (!tasksByList.has(mappedListId)) {
@@ -159,28 +196,58 @@ export class ImportsProcessor extends WorkerHost {
         for (const [listId, tasks] of tasksByList.entries()) {
           if (tasks.length >= 100) {
             pipeline.pause();
-            await this.taskService.createMultipleSameList(userId, listId, tasks);
+            const tasksToCreate = [...tasks];
             tasksByList.delete(listId);
-            pipeline.resume();
+
+            this.taskService
+              .createMultipleSameList(userId, listId, tasksToCreate)
+              .then(() => {
+                pipeline.resume();
+              })
+              .catch((error: Error) => {
+                this.logger.error(`[Worker] Error creating tasks: ${error.message}`);
+                reject(new Error(`Error creating tasks: ${error.message}`));
+              });
             break;
           }
         }
-      });
+      };
 
-      pipeline.on('end', async () => {
+      const handleEnd = (): void => {
+        const promises: Promise<void>[] = [];
+
         for (const [listId, tasks] of tasksByList.entries()) {
           if (tasks.length > 0) {
-            await this.taskService.createMultipleSameList(userId, listId, tasks);
+            promises.push(
+              this.taskService.createMultipleSameList(userId, listId, tasks).then(() => undefined),
+            );
           }
         }
-        this.logger.log(`[Worker] All tasks processed successfully`);
-        resolve(true);
-      });
 
-      pipeline.on('error', (error) => {
+        if (promises.length > 0) {
+          Promise.all(promises)
+            .then(() => {
+              this.logger.log(`[Worker] All tasks processed successfully`);
+              resolve(true);
+            })
+            .catch((error: Error) => {
+              this.logger.error(`[Worker] Error creating final tasks: ${error.message}`);
+              reject(new Error(`Error creating final tasks: ${error.message}`));
+            });
+        } else {
+          this.logger.log(`[Worker] All tasks processed successfully`);
+          resolve(true);
+        }
+      };
+
+      const handleError = (error: Error): void => {
         this.logger.error(`[Worker] Error processing tasks: ${error.message}`);
-        reject(error);
-      });
+        reject(new Error(`Error processing tasks: ${error.message}`));
+      };
+
+      pipeline.on('data', handleData);
+      pipeline.on('end', handleEnd);
+      pipeline.on('error', handleError);
     });
   }
 }

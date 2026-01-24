@@ -60,9 +60,7 @@ export abstract class BaseGateway
 
       await client.join(safeUser.id);
 
-      this.logger.log(
-        `Client connected: ${client.id}, User: ${safeUser.name ?? 'Unknown'}`,
-      );
+      this.logger.log(`Client connected: ${client.id}, User: ${safeUser.name ?? 'Unknown'}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error('WebSocket authentication failed:', message);

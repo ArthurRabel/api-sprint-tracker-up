@@ -1,8 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as handlebars from 'handlebars';
+
 import { Injectable, Inject, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as handlebars from 'handlebars';
 import { Transporter } from 'nodemailer';
 
 @Injectable()
@@ -24,18 +25,18 @@ export class EmailService {
     const filePath = path.join(process.cwd(), 'dist', 'email', 'templates', templateName);
     try {
       return fs.readFileSync(filePath, 'utf8');
-    } catch(erro) {
-      throw new InternalServerErrorException('Error loading email template.', erro);
+    } catch {
+      throw new InternalServerErrorException('Error loading email template.');
     }
   }
 
-  private renderTemplate(templateName: string, context: Record<string, any>): string {
+  private renderTemplate(templateName: string, context: Record<string, unknown>): string {
     const source = this.loadTemplate(templateName);
     try {
       const tpl = handlebars.compile(source);
       return tpl(context);
-    } catch(erro) {
-      throw new InternalServerErrorException('Error rendering email template.', erro);
+    } catch {
+      throw new InternalServerErrorException('Error rendering email template.');
     }
   }
 

@@ -1,13 +1,11 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
 @Injectable()
 export class EmailListener {
-  constructor(
-    @InjectQueue('email-queue') private emailQueue: Queue,
-  ) {}
+  constructor(@InjectQueue('email-queue') private emailQueue: Queue) {}
 
   @OnEvent('user.registered')
   async handleUserRegisteredEvent(payload: { email: string; name: string }) {
