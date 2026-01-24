@@ -7,12 +7,7 @@ import { AuthenticatedUser } from '@/common/interfaces/user.interface';
 import { UserService } from '@/user/user.service';
 
 import { UpdateUserDto } from './dto/update-user.dto';
-import {
-  GetUserDocs,
-  UpdateUserDocs,
-  DeleteAccountDocs,
-  GetNotificationsDocs,
-} from './user.docs';
+import { GetUserDocs, UpdateUserDocs, DeleteAccountDocs, GetNotificationsDocs } from './user.docs';
 
 @ApiCookieAuth()
 @ApiTags('User')

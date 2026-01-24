@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { ValidationPipe, VersioningType, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -6,8 +9,6 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import * as fs from 'fs';
-import * as path from 'path';
 
 import { AppModule } from './app.module';
 
@@ -74,7 +75,10 @@ async function bootstrap() {
     .setTitle('API docs - Sprint Tracker Up')
     .setDescription(description)
     .addCookieAuth('sprinttacker-session')
-    .setExternalDoc('Additional documentation', 'https://github.com/ArthurRabel/api-sprint-tracker-up')
+    .setExternalDoc(
+      'Additional documentation',
+      'https://github.com/ArthurRabel/api-sprint-tracker-up',
+    )
     .setContact('Arthur Rabelo', '', 'arthur.rabelo@outlook.com')
     .setLicense(
       'License GPL-3.0',
@@ -82,28 +86,19 @@ async function bootstrap() {
     )
     .addTag(
       'Authentication and Authorization',
-      'Endpoints for login, logout, token generation, password management, and session validation using JWT in cookies.'
+      'Endpoints for login, logout, token generation, password management, and session validation using JWT in cookies.',
     )
     .addTag(
       'User',
-      'User profile management, registration, update, and retrieval of user information.'
+      'User profile management, registration, update, and retrieval of user information.',
     )
-    .addTag(
-      'Boards',
-      'Create, list, update, and delete boards. Manage board settings and members.'
-    )
-    .addTag(
-      'Lists',
-      'Manage lists within boards: create, order, update, and remove lists.'
-    )
+    .addTag('Boards', 'Create, list, update, and delete boards. Manage board settings and members.')
+    .addTag('Lists', 'Manage lists within boards: create, order, update, and remove lists.')
     .addTag(
       'Tasks',
-      'CRUD operations for tasks, move between lists, assign users, update status, and delete.'
+      'CRUD operations for tasks, move between lists, assign users, update status, and delete.',
     )
-    .addTag(
-      'Imports',
-      'Import data into the system, including bulk operations and validations.'
-    )
+    .addTag('Imports', 'Import data into the system, including bulk operations and validations.')
     .setVersion('1.0')
     .build();
 

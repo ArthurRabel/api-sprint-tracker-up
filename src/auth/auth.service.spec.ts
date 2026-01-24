@@ -1,11 +1,11 @@
 import { ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient, AuthProvider, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { PrismaService } from '@/prisma/prisma.service';
 import { UserService } from '@/user/user.service';

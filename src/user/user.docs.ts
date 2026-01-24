@@ -1,9 +1,5 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import {
-  ApiOperation,
-  ApiResponse,
-  ApiNotFoundResponse,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 
 export function GetUserDocs() {
   return applyDecorators(

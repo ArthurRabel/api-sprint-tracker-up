@@ -8,11 +8,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { User, AuthProvider } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { Client } from 'ldapts';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { ChangePasswordDto, SignInDto, SignUpDto, VerifyResetCodeDto } from '@/auth/dto';
 import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
@@ -87,12 +87,12 @@ export class AuthService {
     const hashedPassword = await this.hashPassword(dto.password);
 
     const user = await this.userService.createUser(
-      { 
-        email: dto.email, 
-        name: dto.name, 
+      {
+        email: dto.email,
+        name: dto.name,
         userName: dto.userName,
-        passwordHash: hashedPassword 
-      }, 
+        passwordHash: hashedPassword,
+      },
       AuthProvider.LOCAL,
     );
 
@@ -130,10 +130,7 @@ export class AuthService {
     });
 
     if (!user) {
-      user = await this.userService.createUser(
-        { email, name, providerId },
-        provider,
-      );
+      user = await this.userService.createUser({ email, name, providerId }, provider);
     }
 
     return this.generateJwt(user);
@@ -160,9 +157,9 @@ export class AuthService {
       },
     });
 
-    this.eventEmitter.emit('user.forgotPassword', { 
-      email: user.email, 
-      resetToken: code 
+    this.eventEmitter.emit('user.forgotPassword', {
+      email: user.email,
+      resetToken: code,
     });
   }
 
@@ -268,7 +265,8 @@ export class AuthService {
   }
 
   async authenticateLdap(
-    enrollment: string, password: string
+    enrollment: string,
+    password: string,
   ): Promise<{
     uid: string;
     displayName: string;
@@ -306,7 +304,7 @@ export class AuthService {
       }
       throw new InternalServerErrorException('Error communicating with LDAP server.');
     } finally {
-      await userClient.unbind().catch(() => { });
+      await userClient.unbind().catch(() => {});
     }
   }
 
@@ -335,13 +333,11 @@ export class AuthService {
     } catch {
       throw new InternalServerErrorException('LDAP configuration error: failed to search user DN.');
     } finally {
-      await adminClient.unbind().catch(() => { });
+      await adminClient.unbind().catch(() => {});
     }
   }
 
-  private async getUserAttributes(
-    userDN: string
-  ): Promise<{
+  private async getUserAttributes(userDN: string): Promise<{
     uid: string;
     displayName: string;
     mail: string;
@@ -366,7 +362,7 @@ export class AuthService {
         'LDAP user attributes not found after successful BIND.',
       );
     } finally {
-      await adminClient.unbind().catch(() => { });
+      await adminClient.unbind().catch(() => {});
     }
   }
 

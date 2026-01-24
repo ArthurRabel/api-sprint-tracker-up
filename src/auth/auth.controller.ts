@@ -13,9 +13,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiCookieAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthProvider } from '@prisma/client';
 import { Response } from 'express';
-import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from '@/auth/auth.service';
 import {
@@ -50,7 +50,7 @@ import {
 
 @Throttle({
   short: { limit: 2, ttl: 1000 },
-  long: { limit: 5, ttl: 60000 }
+  long: { limit: 5, ttl: 60000 },
 })
 @ApiTags('Authentication and Authorization')
 @Controller({ path: 'auth', version: '1' })

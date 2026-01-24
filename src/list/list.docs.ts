@@ -28,8 +28,7 @@ export function FindAllListsDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Get all lists from a board',
-      description:
-        'Retrieves all lists from a specific board. Authorized for all board members.',
+      description: 'Retrieves all lists from a specific board. Authorized for all board members.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
@@ -61,8 +60,7 @@ export function UpdateListDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Update a list',
-      description:
-        'Updates a specific list by listId. Authorized for administrators and members.',
+      description: 'Updates a specific list by listId. Authorized for administrators and members.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
@@ -95,8 +93,7 @@ export function RemoveListDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Remove a list',
-      description:
-        'Removes a specific list by listId. Authorized for administrators and members.',
+      description: 'Removes a specific list by listId. Authorized for administrators and members.',
     }),
     ApiResponse({
       status: HttpStatus.OK,

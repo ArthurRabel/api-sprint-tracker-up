@@ -1,9 +1,5 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import {
-  ApiOperation,
-  ApiResponse,
-  ApiInternalServerErrorResponse,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiInternalServerErrorResponse } from '@nestjs/swagger';
 
 export function GetHealthDocs() {
   return applyDecorators(

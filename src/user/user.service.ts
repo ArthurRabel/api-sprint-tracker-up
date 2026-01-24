@@ -1,6 +1,6 @@
 import { HttpException, Injectable, NotFoundException, HttpStatus } from '@nestjs/common';
-import { AuthProvider, User, Role } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AuthProvider, User, Role } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 

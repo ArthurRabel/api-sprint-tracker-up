@@ -8,6 +8,7 @@ import { BoardRoles } from '@/auth/strategy/decorators/board-rules.decorator';
 import { ListService } from '@/list/list.service';
 
 import { CreateListDto } from './dto/create-list.dto';
+import { UpdateListDto } from './dto/update-list.dto';
 import {
   CreateListDocs,
   FindAllListsDocs,
@@ -16,7 +17,6 @@ import {
   UpdateListPositionDocs,
   RemoveListDocs,
 } from './list.docs';
-import { UpdateListDto } from './dto/update-list.dto';
 
 @ApiCookieAuth()
 @ApiTags('Lists')

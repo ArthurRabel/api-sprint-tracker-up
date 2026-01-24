@@ -65,8 +65,7 @@ export function UpdateBoardDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Update a specific board',
-      description:
-        'Updates a specific board by ID. Authorized only for administrators.',
+      description: 'Updates a specific board by ID. Authorized only for administrators.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
@@ -83,8 +82,7 @@ export function RemoveBoardDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Delete a specific board',
-      description:
-        'Deletes a specific board by ID. Authorized only for administrators.',
+      description: 'Deletes a specific board by ID. Authorized only for administrators.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
@@ -136,9 +134,8 @@ export function RemoveMemberDocs() {
 export function ChangeMemberRoleDocs() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Change a member\'s role',
-      description:
-        'Allows a board ADMIN to change a member\'s role. Example: ADMIN -> MEMBER.',
+      summary: "Change a member's role",
+      description: "Allows a board ADMIN to change a member's role. Example: ADMIN -> MEMBER.",
     }),
     ApiResponse({
       status: HttpStatus.OK,

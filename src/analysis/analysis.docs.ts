@@ -12,8 +12,7 @@ export function GetCompletedTasksSummaryDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Completed tasks summary',
-      description:
-        'Gets a summary of completed tasks in a specific period, with optional filters.',
+      description: 'Gets a summary of completed tasks in a specific period, with optional filters.',
     }),
     ApiQuery({
       name: 'startDate',
@@ -50,8 +49,7 @@ export function GetBasicSummaryDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Basic tasks summary',
-      description:
-        'Gets basic task statistics for a board: count and percentage by status.',
+      description: 'Gets basic task statistics for a board: count and percentage by status.',
     }),
     ApiResponse({
       status: HttpStatus.OK,

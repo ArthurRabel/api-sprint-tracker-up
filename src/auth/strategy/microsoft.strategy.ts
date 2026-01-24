@@ -48,7 +48,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
     const user: ProviderUser = {
       providerId: profile.id,
       email: profile.emails[0].value,
-      name: profile.displayName
+      name: profile.displayName,
     };
 
     done(null, user);

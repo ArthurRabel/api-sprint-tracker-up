@@ -11,7 +11,7 @@ export class ListService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly boardGateway: BoardGateway,
-  ) { }
+  ) {}
 
   async create(dto: CreateListDto) {
     return this.prisma.$transaction(async (tx) => {
@@ -19,7 +19,7 @@ export class ListService {
         const lastList = await tx.list.findFirst({
           where: { boardId: dto[0].boardId },
           orderBy: { position: 'desc' },
-          select: { position: true }
+          select: { position: true },
         });
         dto.position = (lastList?.position ?? 0) + 1;
       }
@@ -45,12 +45,12 @@ export class ListService {
 
   async createMultipleSameBoard(dto: CreateListDto[]) {
     if (dto.length === 0) return;
-    
+
     return this.prisma.$transaction(async (tx) => {
       const lastList = await tx.list.findFirst({
         where: { boardId: dto[0].boardId },
         orderBy: { position: 'desc' },
-        select: { position: true }
+        select: { position: true },
       });
 
       const startPosition = (lastList?.position ?? 0) + 1;
@@ -62,7 +62,7 @@ export class ListService {
           title: listDto.title,
           position: startPosition + index,
           isArchived: listDto.isArchived,
-        }))
+        })),
       });
 
       const payload = {
@@ -72,8 +72,8 @@ export class ListService {
       };
       this.boardGateway.emitModifiedInBoard(dto[0].boardId, payload);
       return createdLists;
-    })
-  };
+    });
+  }
 
   async findAll(boardId: string) {
     return this.prisma.list.findMany({

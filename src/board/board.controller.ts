@@ -8,12 +8,6 @@ import { BoardRoles } from '@/auth/strategy/decorators/board-rules.decorator';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
 
-import { BoardService } from './board.service';
-import { CreateBoardDto } from './dto/create-board.dto';
-import { InviteBoardDto } from './dto/invite-to-board.dto';
-import { ResponseInviteBoardDto } from './dto/response-invite.dto';
-import { UpdateBoardDto } from './dto/update-board.dto';
-import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import {
   CreateBoardDocs,
   FindAllBoardsDocs,
@@ -26,6 +20,12 @@ import {
   InviteBoardDocs,
   ResponseInviteBoardDocs,
 } from './board.docs';
+import { BoardService } from './board.service';
+import { CreateBoardDto } from './dto/create-board.dto';
+import { InviteBoardDto } from './dto/invite-to-board.dto';
+import { ResponseInviteBoardDto } from './dto/response-invite.dto';
+import { UpdateBoardDto } from './dto/update-board.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 
 @ApiCookieAuth()
 @ApiTags('Boards')
