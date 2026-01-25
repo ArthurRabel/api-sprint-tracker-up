@@ -54,7 +54,7 @@ model BoardMember {
   userId   String
   role     Role
   joinedAt DateTime @default(now())
-  board    Board    @relation(fields: [boardId], references: [id])
+  board    Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id])
 
   @@id([boardId, userId])
@@ -81,7 +81,7 @@ model List {
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  board      Board    @relation(fields: [boardId], references: [id])
+  board      Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   tasks      Task[]
 }
 
@@ -102,7 +102,7 @@ model Task {
   completedAt  DateTime?
   creator      User        @relation("TaskCreator", fields: [creatorId], references: [id])
   assignedTo   User?       @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
-  list         List        @relation(fields: [listId], references: [id])
+  list         List        @relation(fields: [listId], references: [id], onDelete: Cascade)
   labels       TaskLabel[]
 }
 
@@ -113,15 +113,15 @@ model Label {
   color     String
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-  board     Board       @relation(fields: [boardId], references: [id])
+  board     Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
   tasks     TaskLabel[]
 }
 
 model TaskLabel {
   taskId  String
   labelId String
-  label   Label  @relation(fields: [labelId], references: [id])
-  task    Task   @relation(fields: [taskId], references: [id])
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@id([taskId, labelId])
 }
@@ -135,7 +135,7 @@ model Invite {
   createdAt    DateTime      @default(now())
   statusInvite statusInvite  @default(PENDING)
   role         Role          @default(MEMBER)
-  board        Board         @relation(fields: [boardId], references: [id])
+  board        Board         @relation(fields: [boardId], references: [id], onDelete: Cascade)
   sender       User          @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
   notification Notification?
 }

@@ -101,45 +101,7 @@ export class BoardService {
 
   async remove(boardId: string) {
     await this.findOne(boardId);
-    await this.prisma.$transaction(async (tx) => {
-      const lists = await tx.list.findMany({
-        where: { boardId },
-        select: { id: true },
-      });
-      const listIds = lists.map((l) => l.id);
-
-      if (listIds.length) {
-        const tasks = await tx.task.findMany({
-          where: { listId: { in: listIds } },
-          select: { id: true },
-        });
-        const taskIds = tasks.map((t) => t.id);
-
-        if (taskIds.length) {
-          await tx.taskLabel.deleteMany({ where: { taskId: { in: taskIds } } });
-          await tx.task.deleteMany({ where: { id: { in: taskIds } } });
-        }
-
-        await tx.list.deleteMany({ where: { id: { in: listIds } } });
-      }
-
-      const labels = await tx.label.findMany({
-        where: { boardId },
-        select: { id: true },
-      });
-      const labelIds = labels.map((l) => l.id);
-      if (labelIds.length) {
-        await tx.taskLabel.deleteMany({ where: { labelId: { in: labelIds } } });
-        await tx.label.deleteMany({ where: { id: { in: labelIds } } });
-      }
-
-      await tx.invite.deleteMany({ where: { boardId } });
-
-      await tx.boardMember.deleteMany({ where: { boardId } });
-
-      await tx.board.delete({ where: { id: boardId } });
-    });
-
+    await this.prisma.board.delete({ where: { id: boardId } });
     return { message: 'Board deleted successfully' };
   }
 
@@ -195,48 +157,7 @@ export class BoardService {
 
         if (!nextMember) {
           // No ADMIN or MEMBER (only observers or none): delete board and relationships
-          await this.prisma.$transaction(async (tx) => {
-            const lists = await tx.list.findMany({
-              where: { boardId },
-              select: { id: true },
-            });
-            const listIds = lists.map((l) => l.id);
-
-            const tasks = listIds.length
-              ? await tx.task.findMany({
-                  where: { listId: { in: listIds } },
-                  select: { id: true },
-                })
-              : [];
-            const taskIds = tasks.map((t) => t.id);
-
-            if (taskIds.length) {
-              await tx.taskLabel.deleteMany({
-                where: { taskId: { in: taskIds } },
-              });
-              await tx.task.deleteMany({ where: { id: { in: taskIds } } });
-            }
-
-            if (listIds.length) {
-              await tx.list.deleteMany({ where: { id: { in: listIds } } });
-            }
-
-            const labels = await tx.label.findMany({
-              where: { boardId },
-              select: { id: true },
-            });
-            const labelIds = labels.map((l) => l.id);
-            if (labelIds.length) {
-              await tx.taskLabel.deleteMany({
-                where: { labelId: { in: labelIds } },
-              });
-              await tx.label.deleteMany({ where: { id: { in: labelIds } } });
-            }
-
-            await tx.invite.deleteMany({ where: { boardId } });
-            await tx.boardMember.deleteMany({ where: { boardId } });
-            await tx.board.delete({ where: { id: boardId } });
-          });
+          await this.prisma.board.delete({ where: { id: boardId } });
 
           return {
             message: 'Board deleted, you were the only eligible member (no ADMIN/MEMBER)',
