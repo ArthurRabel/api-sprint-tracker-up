@@ -1,11 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
 
-enum RoleUserBoard {
-  ADMIN = 'ADMIN',
-  MEMBER = 'MEMBER',
-  OBSERVER = 'OBSERVER',
-}
+import { Role } from '../types/board.types';
 
 export class InviteBoardDto {
   @ApiProperty({
@@ -18,9 +14,9 @@ export class InviteBoardDto {
   @ApiProperty({
     example: 'OBSERVER',
     description: 'User permission on the board. Can be ADMIN, MEMBER or OBSERVER',
-    enum: RoleUserBoard,
+    enum: Role,
   })
   @IsOptional()
-  @IsEnum(RoleUserBoard)
-  role: RoleUserBoard;
+  @IsEnum(Role)
+  role: Role;
 }

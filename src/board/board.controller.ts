@@ -1,6 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
 
 import { BoardRoleGuard } from '@/auth/guards/board-role.guard';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
@@ -26,11 +25,12 @@ import { InviteBoardDto } from './dto/invite-to-board.dto';
 import { ResponseInviteBoardDto } from './dto/response-invite.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { Role } from './types/board.types';
 
 @ApiCookieAuth()
 @ApiTags('Boards')
 @UseGuards(JwtAuthGuard)
-@Controller({ path: 'boards', version: '1' })
+@Controller({ path: 'board', version: '1' })
 export class BoardController {
   constructor(private readonly boardService: BoardService) {}
 
@@ -81,8 +81,8 @@ export class BoardController {
 
   @RemoveMemberDocs()
   @UseGuards(JwtAuthGuard, BoardRoleGuard)
-  @BoardRoles(Role.ADMIN)
-  @Delete(':boardId/members/:userId')
+  @BoardRoles(Role.ADMIN, Role.MEMBER, Role.OBSERVER)
+  @Delete(':boardId/member/:userId')
   removeMember(
     @CurrentUser() user: AuthenticatedUser,
     @Param('boardId') boardId: string,
@@ -94,7 +94,7 @@ export class BoardController {
   @ChangeMemberRoleDocs()
   @UseGuards(JwtAuthGuard, BoardRoleGuard)
   @BoardRoles(Role.ADMIN)
-  @Patch(':boardId/members/:userId/role')
+  @Patch(':boardId/member/:userId/role')
   changeMemberRole(
     @CurrentUser() requester: AuthenticatedUser,
     @Param('boardId') boardId: string,

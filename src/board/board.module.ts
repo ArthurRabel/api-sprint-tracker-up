@@ -4,10 +4,11 @@ import { EventsModule } from '@/events/events.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 
 import { BoardController } from './board.controller';
+import { BoardRepository } from './board.repository';
 import { BoardService } from './board.service';
 
 @Module({
-  providers: [BoardService],
+  providers: [BoardService, BoardRepository],
   controllers: [BoardController],
   imports: [EventsModule, PrismaModule],
 })

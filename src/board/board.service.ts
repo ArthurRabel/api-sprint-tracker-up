@@ -1,84 +1,61 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 
 import { BoardGateway } from '@/events/board.gateway';
 import { NotificationsGateway } from '@/events/notification.gateway';
-import { PrismaService } from '@/prisma/prisma.service';
 
+import { BOARD_ACTIONS, ERROR_MESSAGES, SUCCESS_MESSAGES } from './board.constants';
+import { BoardRepository } from './board.repository';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { InviteBoardDto } from './dto/invite-to-board.dto';
 import { ResponseInviteBoardDto } from './dto/response-invite.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { Board, BoardMember, Invite, Role } from './types/board.types';
 
 @Injectable()
 export class BoardService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly repository: BoardRepository,
     private readonly notificationsGateway: NotificationsGateway,
     private readonly boardGateway: BoardGateway,
   ) {}
 
   async create(ownerId: string, dto: CreateBoardDto) {
-    const board = await this.prisma.board.create({
-      data: {
-        ...dto,
-        ownerId,
-      },
+    const board = await this.repository.createBoard({
+      ...dto,
+      ownerId,
     });
 
-    await this.prisma.boardMember.create({
-      data: {
-        boardId: board.id,
-        userId: ownerId,
-        role: 'ADMIN',
-      },
-    });
+    await this.repository.createBoardMember(board.id, ownerId, Role.ADMIN);
 
     return board;
   }
 
   async findAll(idUser: string) {
-    const boards = await this.prisma.board.findMany({
-      where: {
-        members: {
-          some: {
-            userId: idUser,
-          },
-        },
-        isArchived: false,
-      },
-      include: {
-        _count: {
-          select: { members: true },
-        },
-      },
-    });
-
-    return boards.map(({ _count, ...board }) => ({
-      ...board,
-      memberCount: _count?.members ?? 0,
-    }));
+    return this.repository.findManyBoards(idUser);
   }
 
-  async findOne(id: string) {
-    const board = await this.prisma.board.findUnique({ where: { id } });
-    if (!board) throw new NotFoundException('Board not found');
+  async findOne(id: string): Promise<Board> {
+    const board = await this.repository.findBoardById(id);
+    if (!board) {
+      throw new NotFoundException(ERROR_MESSAGES.BOARD_NOT_FOUND);
+    }
     return board;
   }
 
   async getBoardById(boardId: string, userId: string) {
-    const board = await this.prisma.board.findUnique({
-      where: { id: boardId },
-      include: {
-        members: {
-          where: { userId },
-        },
-      },
-    });
+    const board = await this.repository.findBoardByIdWithMember(boardId, userId);
 
-    if (!board) throw new NotFoundException('Board not found');
+    if (!board) {
+      throw new NotFoundException(ERROR_MESSAGES.BOARD_NOT_FOUND);
+    }
     if (board.members.length === 0) {
-      throw new NotFoundException('You do not have access to this board');
+      throw new ForbiddenException(ERROR_MESSAGES.NO_ACCESS);
     }
 
     return board;
@@ -86,196 +63,32 @@ export class BoardService {
 
   async update(boardId: string, dto: UpdateBoardDto) {
     await this.findOne(boardId);
-    const updated = await this.prisma.board.update({
-      where: { id: boardId },
-      data: { ...dto },
-    });
-    const payload = {
-      boardId,
-      action: 'updated',
-      at: new Date().toISOString(),
-    };
-    this.boardGateway.emitModifiedInBoard(boardId, payload);
+    const updated = await this.repository.updateBoard(boardId, dto);
+
+    this.emitBoardEvent(boardId, BOARD_ACTIONS.UPDATED, {});
+
     return updated;
   }
 
   async remove(boardId: string) {
     await this.findOne(boardId);
-    await this.prisma.board.delete({ where: { id: boardId } });
-    return { message: 'Board deleted successfully' };
+    await this.repository.deleteBoard(boardId);
+    return { message: SUCCESS_MESSAGES.BOARD_DELETED };
   }
 
   async listMembers(boardId: string) {
     await this.findOne(boardId);
-    return this.prisma.boardMember.findMany({
-      where: { boardId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            userName: true,
-            email: true,
-            image: true,
-          },
-        },
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
+    return this.repository.findManyBoardMembers(boardId);
   }
 
   async removeMember(boardId: string, memberUserId: string, requesterId: string) {
     const board = await this.findOne(boardId);
 
-    // If the target is the board owner
     if (memberUserId === board.ownerId) {
-      // Only the owner can remove themselves
-      if (requesterId !== memberUserId) {
-        throw new NotFoundException('Cannot remove the board owner');
-      }
-
-      // Try to transfer to the oldest ADMIN (except current owner)
-      const nextAdmin = await this.prisma.boardMember.findFirst({
-        where: {
-          boardId,
-          role: 'ADMIN',
-          userId: { not: requesterId },
-        },
-        orderBy: { joinedAt: 'asc' },
-      });
-
-      if (!nextAdmin) {
-        // No other ADMIN. Try to promote the oldest MEMBER (observers cannot be promoted)
-        const nextMember = await this.prisma.boardMember.findFirst({
-          where: {
-            boardId,
-            role: 'MEMBER',
-            userId: { not: requesterId },
-          },
-          orderBy: { joinedAt: 'asc' },
-        });
-
-        if (!nextMember) {
-          // No ADMIN or MEMBER (only observers or none): delete board and relationships
-          await this.prisma.board.delete({ where: { id: boardId } });
-
-          return {
-            message: 'Board deleted, you were the only eligible member (no ADMIN/MEMBER)',
-          };
-        }
-
-        // Promote the oldest MEMBER to ADMIN and transfer ownership
-        await this.prisma.$transaction(async (tx) => {
-          await tx.boardMember.update({
-            where: {
-              boardId_userId: {
-                boardId,
-                userId: nextMember.userId,
-              },
-            },
-            data: { role: 'ADMIN' },
-          });
-
-          await tx.board.update({
-            where: { id: boardId },
-            data: { ownerId: nextMember.userId },
-          });
-
-          await tx.boardMember.delete({
-            where: {
-              boardId_userId: {
-                boardId,
-                userId: memberUserId,
-              },
-            },
-          });
-        });
-
-        const payload = {
-          boardId,
-          action: 'member_removed',
-          memberUserId,
-          by: requesterId,
-          at: new Date().toISOString(),
-        };
-        this.boardGateway.emitModifiedInBoard(boardId, payload);
-
-        return {
-          message:
-            'Ownership transferred to the oldest member (promoted to ADMIN) and user removed',
-        };
-      }
-
-      // There is another ADMIN: transfer ownership and remove current owner
-      await this.prisma.$transaction(async (tx) => {
-        await tx.board.update({
-          where: { id: boardId },
-          data: { ownerId: nextAdmin.userId },
-        });
-
-        await tx.boardMember.delete({
-          where: {
-            boardId_userId: {
-              boardId,
-              userId: memberUserId,
-            },
-          },
-        });
-      });
-
-      const payload = {
-        boardId,
-        action: 'member_removed',
-        memberUserId,
-        by: requesterId,
-        at: new Date().toISOString(),
-      };
-      this.boardGateway.emitModifiedInBoard(boardId, payload);
-
-      return {
-        message: 'Ownership transferred to the oldest ADMIN and member removed',
-      };
+      return this.handleOwnerRemoval(boardId, memberUserId, requesterId);
     }
 
-    // Target is not the owner: get the target's membership
-    const targetMembership = await this.prisma.boardMember.findFirst({
-      where: { boardId, userId: memberUserId },
-    });
-    if (!targetMembership) {
-      throw new NotFoundException('User is not a member of this board');
-    }
-
-    // If removing another person, must be ADMIN
-    if (requesterId !== memberUserId) {
-      const requesterMembership = await this.prisma.boardMember.findFirst({
-        where: { boardId, userId: requesterId },
-      });
-
-      if (requesterMembership?.role !== 'ADMIN') {
-        throw new NotFoundException('Only administrators can remove other members');
-      }
-    }
-
-    // Self-removal of OBSERVER/MEMBER (and also non-owner ADMIN, allowed)
-    await this.prisma.boardMember.delete({
-      where: {
-        boardId_userId: {
-          boardId,
-          userId: memberUserId,
-        },
-      },
-    });
-
-    const payload = {
-      boardId,
-      action: 'member_removed',
-      memberUserId,
-      by: requesterId,
-      at: new Date().toISOString(),
-    };
-    this.boardGateway.emitModifiedInBoard(boardId, payload);
-
-    return { message: 'Member removed successfully' };
+    return this.handleRegularMemberRemoval(boardId, memberUserId, requesterId);
   }
 
   async changeMemberRole(
@@ -287,137 +100,203 @@ export class BoardService {
     const board = await this.findOne(boardId);
 
     if (targetUserId === board.ownerId) {
-      throw new NotFoundException('Cannot change the board owner role');
+      throw new ForbiddenException(ERROR_MESSAGES.CANNOT_CHANGE_OWNER_ROLE);
     }
 
-    const targetMembership = await this.prisma.boardMember.findFirst({
-      where: { boardId, userId: targetUserId },
-    });
-    if (!targetMembership) {
-      throw new NotFoundException('User is not a member of this board');
-    }
+    const targetMembership = await this.getMemberOrFail(boardId, targetUserId);
 
-    if (targetMembership.role === 'ADMIN' && dto.role !== 'ADMIN') {
-      const adminCount = await this.prisma.boardMember.count({
-        where: { boardId, role: 'ADMIN' },
-      });
-      if (adminCount <= 1) {
-        throw new NotFoundException('Cannot demote the only ADMIN of the board');
-      }
-    }
+    await this.validateAdminDemotion(boardId, targetMembership.role, dto.role);
 
-    const updated = await this.prisma.boardMember.update({
-      where: {
-        boardId_userId: {
-          boardId,
-          userId: targetUserId,
-        },
-      },
-      data: { role: dto.role },
-    });
+    const updated = await this.repository.updateBoardMemberRole(boardId, targetUserId, dto.role);
 
-    const payload = {
-      boardId,
-      action: 'member_role_changed',
+    this.emitBoardEvent(boardId, BOARD_ACTIONS.MEMBER_ROLE_CHANGED, {
       memberUserId: targetUserId,
       newRole: dto.role,
       by: requesterId,
-      at: new Date().toISOString(),
-    } as const;
-    this.boardGateway.emitModifiedInBoard(boardId, payload);
+    });
 
-    return { message: 'Role changed successfully', member: updated };
+    return updated;
   }
 
   async invite(boardId: string, senderId: string, dto: InviteBoardDto) {
     await this.findOne(boardId);
 
-    const memberRole = await this.prisma.boardMember.findFirst({
-      where: {
-        boardId,
-        userId: senderId,
-      },
-    });
+    const recipient = await this.getUserByUsernameOrFail(dto.userName);
 
-    if (memberRole?.role !== 'ADMIN') {
-      throw new NotFoundException('You do not have permission to invite users to this board');
-    }
+    await this.validateInviteEligibility(boardId, recipient.id);
 
-    const recipient = await this.prisma.user.findUnique({
-      where: { userName: dto.userName },
-    });
-
-    if (!recipient) {
-      throw new NotFoundException('Recipient not found');
-    }
-
-    const existingInvite = await this.prisma.invite.findFirst({
-      where: {
-        boardId,
-        recipientId: recipient.id,
-      },
-    });
-
-    if (existingInvite) {
-      throw new NotFoundException('There is already a pending invite for this user');
-    }
-
-    const isMember = await this.prisma.boardMember.findFirst({
-      where: {
-        boardId,
-        userId: recipient.id,
-      },
-    });
-
-    if (isMember) {
-      throw new NotFoundException('This user is already a member of the board');
-    }
-
-    await this.prisma.invite.create({
-      data: {
-        boardId,
-        senderId: senderId,
-        recipientId: recipient.id,
-        email: recipient.email,
-        role: dto.role,
-      },
-    });
+    await this.repository.createInvite(boardId, senderId, recipient.id, recipient.email, dto.role);
 
     this.notificationsGateway.sendNewNotificationToUser(recipient.id);
 
-    return { message: 'Invite sent successfully' };
+    return { message: SUCCESS_MESSAGES.INVITE_SENT };
   }
 
   async responseInvite(boardId: string, recipientId: string, dto: ResponseInviteBoardDto) {
-    const invite = await this.prisma.invite.findUnique({
-      where: { id: dto.idInvite },
-    });
+    const invite = await this.getInviteOrFail(dto.idInvite);
 
-    if (!invite) {
-      throw new NotFoundException('Invite not found');
-    }
-
-    if (invite.recipientId !== recipientId) {
-      throw new NotFoundException('You do not have permission to accept this invite');
-    }
+    this.validateInviteRecipient(invite, recipientId);
 
     if (!dto.response) {
-      await this.prisma.invite.delete({ where: { id: dto.idInvite } });
-      return { message: 'Invite declined successfully' };
+      await this.repository.deleteInvite(dto.idInvite);
+      return { message: SUCCESS_MESSAGES.INVITE_DECLINED };
     }
 
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.boardMember.create({
-        data: {
-          boardId,
-          userId: recipientId,
-          role: invite.role,
-        },
-      });
+    await this.acceptInvite(boardId, recipientId, invite, dto.idInvite);
 
-      await prisma.invite.delete({ where: { id: dto.idInvite } });
+    return { message: SUCCESS_MESSAGES.INVITE_ACCEPTED };
+  }
+
+  private async getMemberOrFail(boardId: string, userId: string): Promise<BoardMember> {
+    const member = await this.repository.findBoardMember(boardId, userId);
+    if (!member) {
+      throw new NotFoundException(ERROR_MESSAGES.MEMBER_NOT_FOUND);
+    }
+    return member;
+  }
+
+  private async transferOwnershipAndRemove(
+    boardId: string,
+    newOwnerId: string,
+    memberToRemoveId: string,
+    shouldPromoteToAdmin = false,
+  ) {
+    await this.repository.transferOwnershipAndRemoveMember(
+      boardId,
+      newOwnerId,
+      memberToRemoveId,
+      shouldPromoteToAdmin,
+    );
+  }
+
+  private async handleOwnerRemoval(boardId: string, ownerId: string, requesterId: string) {
+    if (requesterId !== ownerId) {
+      throw new ForbiddenException(ERROR_MESSAGES.CANNOT_REMOVE_OWNER);
+    }
+
+    const nextAdmin = await this.repository.findNextAdmin(boardId, requesterId);
+
+    if (nextAdmin) {
+      await this.transferOwnershipAndRemove(boardId, nextAdmin.userId, ownerId);
+      this.emitMemberRemovedEvent(boardId, ownerId, requesterId);
+      return { message: SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED_ADMIN };
+    }
+
+    const nextMember = await this.repository.findNextMember(boardId, requesterId);
+
+    if (nextMember) {
+      await this.transferOwnershipAndRemove(boardId, nextMember.userId, ownerId, true);
+      this.emitMemberRemovedEvent(boardId, ownerId, requesterId);
+      return { message: SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED_MEMBER };
+    }
+
+    await this.repository.deleteBoard(boardId);
+    return { message: SUCCESS_MESSAGES.BOARD_DELETED_ONLY_OWNER };
+  }
+
+  private async handleRegularMemberRemoval(
+    boardId: string,
+    memberUserId: string,
+    requesterId: string,
+  ) {
+    await this.getMemberOrFail(boardId, memberUserId);
+
+    if (requesterId !== memberUserId) {
+      await this.validateAdminPermission(boardId, requesterId);
+    }
+
+    await this.repository.deleteBoardMember(boardId, memberUserId);
+
+    this.emitMemberRemovedEvent(boardId, memberUserId, requesterId);
+
+    return { message: SUCCESS_MESSAGES.MEMBER_REMOVED };
+  }
+
+  private async validateAdminPermission(boardId: string, userId: string) {
+    const membership = await this.repository.findBoardMember(boardId, userId);
+
+    if (membership?.role !== Role.ADMIN) {
+      throw new ForbiddenException(ERROR_MESSAGES.ONLY_ADMINS_CAN_REMOVE);
+    }
+  }
+
+  private async validateAdminDemotion(boardId: string, currentRole: Role, newRole: Role) {
+    if (currentRole === Role.ADMIN && newRole !== Role.ADMIN) {
+      const adminCount = await this.repository.countAdmins(boardId);
+
+      if (adminCount <= 1) {
+        throw new BadRequestException(ERROR_MESSAGES.CANNOT_DEMOTE_ONLY_ADMIN);
+      }
+    }
+  }
+
+  private async getUserByUsernameOrFail(userName: string) {
+    const user = await this.repository.findUserByUsername(userName);
+
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.RECIPIENT_NOT_FOUND);
+    }
+
+    return user;
+  }
+
+  private async validateInviteEligibility(boardId: string, userId: string) {
+    const existingInvite = await this.repository.findPendingInvite(boardId, userId);
+
+    if (existingInvite) {
+      throw new BadRequestException(ERROR_MESSAGES.PENDING_INVITE_EXISTS);
+    }
+
+    const isMember = await this.repository.findBoardMember(boardId, userId);
+
+    if (isMember) {
+      throw new BadRequestException(ERROR_MESSAGES.ALREADY_MEMBER);
+    }
+  }
+
+  private async getInviteOrFail(inviteId: string): Promise<Invite> {
+    const invite = await this.repository.findInvite(inviteId);
+
+    if (!invite) {
+      throw new NotFoundException(ERROR_MESSAGES.INVITE_NOT_FOUND);
+    }
+
+    return invite;
+  }
+
+  private validateInviteRecipient(invite: Invite, recipientId: string) {
+    if (invite.recipientId !== recipientId) {
+      throw new ForbiddenException(ERROR_MESSAGES.NO_PERMISSION_FOR_INVITE);
+    }
+  }
+
+  private async acceptInvite(
+    boardId: string,
+    recipientId: string,
+    invite: Invite,
+    inviteId: string,
+  ) {
+    await this.repository.acceptInviteTransaction(boardId, recipientId, invite.role, inviteId);
+  }
+
+  private emitBoardEvent(
+    boardId: string,
+    action: string,
+    additionalData: Record<string, string | number | boolean> = {},
+  ) {
+    const payload = {
+      boardId,
+      action,
+      ...additionalData,
+      at: new Date().toISOString(),
+    };
+    this.boardGateway.emitModifiedInBoard(boardId, payload);
+  }
+
+  private emitMemberRemovedEvent(boardId: string, memberUserId: string, by: string) {
+    this.emitBoardEvent(boardId, BOARD_ACTIONS.MEMBER_REMOVED, {
+      memberUserId,
+      by,
     });
-
-    return { message: 'Invite accepted successfully' };
   }
 }
