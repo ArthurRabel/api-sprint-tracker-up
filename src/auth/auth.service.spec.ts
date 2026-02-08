@@ -3,21 +3,21 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaClient, AuthProvider, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { PrismaService } from '@/prisma/prisma.service';
 import { UserService } from '@/user/user.service';
 
+import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
 import { SignUpDto, SignInDto, ChangePasswordDto, VerifyResetCodeDto } from './dto';
+import { AuthProvider, Role, User } from './types/auth.types';
 
 jest.mock('argon2');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: DeepMockProxy<PrismaService>;
+  let authRepository: DeepMockProxy<AuthRepository>;
   let configService: DeepMockProxy<ConfigService>;
   let jwtService: DeepMockProxy<JwtService>;
   let eventEmitter: DeepMockProxy<EventEmitter2>;
@@ -29,7 +29,7 @@ describe('AuthService', () => {
   const mockHashedPassword = 'hashed_password123';
   const mockAccessToken = 'mockAccessToken';
 
-  const createMockUser = (overrides = {}) => ({
+  const createMockUser = (overrides = {}): User => ({
     id: mockUserId,
     email: mockEmail,
     name: 'Test User',
@@ -51,7 +51,7 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
+        { provide: AuthRepository, useValue: mockDeep<AuthRepository>() },
         { provide: JwtService, useValue: mockDeep<JwtService>() },
         { provide: ConfigService, useValue: mockDeep<ConfigService>() },
         { provide: EventEmitter2, useValue: mockDeep<EventEmitter2>() },
@@ -60,7 +60,7 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get(PrismaService);
+    authRepository = module.get(AuthRepository);
     jwtService = module.get(JwtService);
     configService = module.get(ConfigService);
     eventEmitter = module.get(EventEmitter2);
@@ -87,16 +87,15 @@ describe('AuthService', () => {
         userName: signUpDto.userName,
       });
 
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserByEmail.mockResolvedValue(null);
+      authRepository.findUserByUsername.mockResolvedValue(null);
       userService.createUser.mockResolvedValue(mockUser);
       (argon2.hash as jest.Mock).mockResolvedValue(mockHashedPassword);
 
       const result = await service.signUp(signUpDto);
 
       expect(result).toEqual({ accessToken: mockAccessToken });
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: signUpDto.email },
-      });
+      expect(authRepository.findUserByEmail).toHaveBeenCalledWith(signUpDto.email);
       expect(userService.createUser).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith('user.registered', mockUser);
       expect(jwtService.sign).toHaveBeenCalled();
@@ -104,7 +103,7 @@ describe('AuthService', () => {
 
     it('should throw ConflictException if email already exists', async () => {
       const mockUser = createMockUser({ email: signUpDto.email });
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
 
       await expect(service.signUp(signUpDto)).rejects.toThrow(
         new ConflictException('Email already in use'),
@@ -114,7 +113,8 @@ describe('AuthService', () => {
 
     it('should throw ConflictException if username already exists', async () => {
       const mockUser = createMockUser({ userName: signUpDto.userName });
-      prisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(null);
+      authRepository.findUserByUsername.mockResolvedValue(mockUser);
 
       await expect(service.signUp(signUpDto)).rejects.toThrow(
         new ConflictException('Username already in use'),
@@ -132,15 +132,13 @@ describe('AuthService', () => {
 
     it('should successfully sign in and return access token', async () => {
       const mockUser = createMockUser();
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
 
       const result = await service.signIn(signInDto);
 
       expect(result).toEqual({ accessToken: mockAccessToken });
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: signInDto.email },
-      });
+      expect(authRepository.findUserByEmail).toHaveBeenCalledWith(signInDto.email);
       expect(argon2.verify).toHaveBeenCalledWith(mockHashedPassword, mockPassword);
       expect(jwtService.sign).toHaveBeenCalled();
     });
@@ -149,7 +147,7 @@ describe('AuthService', () => {
       const mockUser = createMockUser();
       const signInWithRemember = { ...signInDto, rememberMe: true };
 
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
 
       await service.signIn(signInWithRemember);
@@ -161,7 +159,7 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserByEmail.mockResolvedValue(null);
 
       await expect(service.signIn(signInDto)).rejects.toThrow(
         new UnauthorizedException('Invalid credentials'),
@@ -170,7 +168,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if user has no password hash', async () => {
       const mockUser = createMockUser({ passwordHash: null });
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
 
       await expect(service.signIn(signInDto)).rejects.toThrow(
         new UnauthorizedException('Invalid credentials'),
@@ -179,7 +177,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if user is not LOCAL provider', async () => {
       const mockUser = createMockUser({ authProvider: AuthProvider.GOOGLE });
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
 
       await expect(service.signIn(signInDto)).rejects.toThrow(
         new UnauthorizedException('Invalid credentials'),
@@ -188,7 +186,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if password is incorrect', async () => {
       const mockUser = createMockUser();
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(service.signIn(signInDto)).rejects.toThrow(
@@ -214,15 +212,13 @@ describe('AuthService', () => {
         passwordHash: null,
       });
 
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserByEmail.mockResolvedValue(null);
       userService.createUser.mockResolvedValue(newUser);
 
       const result = await service.signInWithProvider(AuthProvider.GOOGLE, providerData);
 
       expect(result).toEqual({ accessToken: mockAccessToken });
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: providerData.email },
-      });
+      expect(authRepository.findUserByEmail).toHaveBeenCalledWith(providerData.email);
       expect(userService.createUser).toHaveBeenCalledWith(
         { email: providerData.email, name: providerData.name, providerId: providerData.providerId },
         AuthProvider.GOOGLE,
@@ -235,7 +231,7 @@ describe('AuthService', () => {
         authProvider: AuthProvider.GOOGLE,
       });
 
-      prisma.user.findUnique.mockResolvedValue(existingUser);
+      authRepository.findUserByEmail.mockResolvedValue(existingUser);
 
       const result = await service.signInWithProvider(AuthProvider.GOOGLE, providerData);
 
@@ -249,7 +245,7 @@ describe('AuthService', () => {
         authProvider: AuthProvider.MICROSOFT,
       });
 
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserByEmail.mockResolvedValue(null);
       userService.createUser.mockResolvedValue(newUser);
 
       const result = await service.signInWithProvider(AuthProvider.MICROSOFT, providerData);
@@ -267,21 +263,17 @@ describe('AuthService', () => {
 
     it('should generate reset token and emit event', async () => {
       const mockUser = createMockUser();
-      prisma.user.findUnique.mockResolvedValue(mockUser);
-      prisma.user.update.mockResolvedValue(mockUser);
+      authRepository.findUserByEmail.mockResolvedValue(mockUser);
+      authRepository.updateUserResetToken.mockResolvedValue(undefined);
 
       await service.forgotPassword(forgotPasswordDto);
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: mockEmail },
-      });
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { email: mockEmail },
-        data: expect.objectContaining({
-          resetToken: expect.any(String),
-          resetTokenExpiresAt: expect.any(Date),
-        }),
-      });
+      expect(authRepository.findUserByEmail).toHaveBeenCalledWith(mockEmail);
+      expect(authRepository.updateUserResetToken).toHaveBeenCalledWith(
+        mockEmail,
+        expect.any(String),
+        expect.any(Date),
+      );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         'user.forgotPassword',
         expect.objectContaining({
@@ -292,11 +284,11 @@ describe('AuthService', () => {
     });
 
     it('should do nothing if user not found (security)', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserByEmail.mockResolvedValue(null);
 
       await service.forgotPassword(forgotPasswordDto);
 
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(authRepository.updateUserResetToken).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
@@ -311,24 +303,18 @@ describe('AuthService', () => {
         resetTokenExpiresAt: new Date(Date.now() + 10000),
       });
 
-      prisma.user.findFirst.mockResolvedValue(mockUser);
-      prisma.user.update.mockResolvedValue(mockUser);
+      authRepository.findUserByResetToken.mockResolvedValue(mockUser);
+      authRepository.clearUserResetToken.mockResolvedValue(undefined);
       jwtService.sign.mockReturnValue(resetJwtToken);
 
       const result = await service.verifyResetCode(verifyDto);
 
       expect(result).toBe(resetJwtToken);
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: mockUser.id },
-        data: {
-          resetToken: null,
-          resetTokenExpiresAt: null,
-        },
-      });
+      expect(authRepository.clearUserResetToken).toHaveBeenCalledWith(mockUser.id);
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
-      prisma.user.findFirst.mockResolvedValue(null);
+      authRepository.findUserByResetToken.mockResolvedValue(null);
 
       await expect(service.verifyResetCode(verifyDto)).rejects.toThrow(
         new UnauthorizedException('Invalid or expired code.'),
@@ -340,7 +326,7 @@ describe('AuthService', () => {
         resetToken: 'different-code',
         resetTokenExpiresAt: new Date(Date.now() + 10000),
       });
-      prisma.user.findFirst.mockResolvedValue(mockUser);
+      authRepository.findUserByResetToken.mockResolvedValue(mockUser);
 
       await expect(service.verifyResetCode(verifyDto)).rejects.toThrow(
         new UnauthorizedException('Invalid verification code.'),
@@ -352,19 +338,13 @@ describe('AuthService', () => {
         resetToken: 'valid-code',
         resetTokenExpiresAt: new Date(Date.now() - 1000),
       });
-      prisma.user.findFirst.mockResolvedValue(mockUser);
-      prisma.user.update.mockResolvedValue(mockUser);
+      authRepository.findUserByResetToken.mockResolvedValue(mockUser);
+      authRepository.clearUserResetToken.mockResolvedValue(undefined);
 
       await expect(service.verifyResetCode(verifyDto)).rejects.toThrow(
         new UnauthorizedException('Verification code expired.'),
       );
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: mockUser.id },
-        data: {
-          resetToken: null,
-          resetTokenExpiresAt: null,
-        },
-      });
+      expect(authRepository.clearUserResetToken).toHaveBeenCalledWith(mockUser.id);
     });
   });
 
@@ -374,15 +354,13 @@ describe('AuthService', () => {
     it('should return user if token is valid', async () => {
       const mockUser = createMockUser();
       jwtService.verify.mockReturnValue({ sub: mockUserId });
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserById.mockResolvedValue(mockUser);
 
       const result = await service.validateUserFromToken(validToken);
 
       expect(result).toEqual(mockUser);
       expect(jwtService.verify).toHaveBeenCalledWith(validToken);
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { id: mockUserId },
-      });
+      expect(authRepository.findUserById).toHaveBeenCalledWith(mockUserId);
     });
 
     it('should return null if token is invalid', async () => {
@@ -397,7 +375,7 @@ describe('AuthService', () => {
 
     it('should return null if user not found', async () => {
       jwtService.verify.mockReturnValue({ sub: mockUserId });
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserById.mockResolvedValue(null);
 
       const result = await service.validateUserFromToken(validToken);
 
@@ -410,20 +388,21 @@ describe('AuthService', () => {
 
     it('should hash and update user password', async () => {
       const mockUser = createMockUser();
+      authRepository.findUserById.mockResolvedValue(mockUser);
       (argon2.hash as jest.Mock).mockResolvedValue('new-hashed-password');
-      prisma.user.update.mockResolvedValue(mockUser);
+      authRepository.updateUserPassword.mockResolvedValue(undefined);
 
       await service.resetPassword(mockUserId, newPassword);
 
       expect(argon2.hash).toHaveBeenCalledWith(newPassword, expect.any(Object));
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: mockUserId },
-        data: { passwordHash: 'new-hashed-password' },
-      });
+      expect(authRepository.updateUserPassword).toHaveBeenCalledWith(
+        mockUserId,
+        'new-hashed-password',
+      );
     });
 
     it('should throw BadRequestException on error', async () => {
-      prisma.user.update.mockRejectedValue(new Error('Database error'));
+      authRepository.findUserById.mockRejectedValue(new Error('Database error'));
 
       await expect(service.resetPassword(mockUserId, newPassword)).rejects.toThrow(
         BadRequestException,
@@ -440,26 +419,24 @@ describe('AuthService', () => {
 
     it('should change password successfully', async () => {
       const mockUser = createMockUser();
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserById.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
       (argon2.hash as jest.Mock).mockResolvedValue('new-hashed-password');
-      prisma.user.update.mockResolvedValue(mockUser);
+      authRepository.updateUserPassword.mockResolvedValue(undefined);
 
       await service.changePassword(mockUserId, changePasswordDto);
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { id: mockUserId },
-      });
+      expect(authRepository.findUserById).toHaveBeenCalledWith(mockUserId);
       expect(argon2.verify).toHaveBeenCalledWith(mockHashedPassword, changePasswordDto.oldPassword);
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: mockUserId },
-        data: { passwordHash: 'new-hashed-password' },
-      });
+      expect(authRepository.updateUserPassword).toHaveBeenCalledWith(
+        mockUserId,
+        'new-hashed-password',
+      );
       expect(eventEmitter.emit).toHaveBeenCalledWith('user.changePassword', mockUser);
     });
 
     it('should throw BadRequestException if user not found', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      authRepository.findUserById.mockResolvedValue(null);
 
       await expect(service.changePassword(mockUserId, changePasswordDto)).rejects.toThrow(
         new BadRequestException('User not found.'),
@@ -468,7 +445,7 @@ describe('AuthService', () => {
 
     it('should throw BadRequestException if user has no password hash (OAuth user)', async () => {
       const mockUser = createMockUser({ passwordHash: null });
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserById.mockResolvedValue(mockUser);
 
       await expect(service.changePassword(mockUserId, changePasswordDto)).rejects.toThrow(
         new BadRequestException(
@@ -479,13 +456,13 @@ describe('AuthService', () => {
 
     it('should throw BadRequestException if old password is incorrect', async () => {
       const mockUser = createMockUser();
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+      authRepository.findUserById.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(service.changePassword(mockUserId, changePasswordDto)).rejects.toThrow(
         new BadRequestException('Incorrect old password.'),
       );
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(authRepository.updateUserPassword).not.toHaveBeenCalled();
     });
   });
 });

@@ -51,7 +51,10 @@ export class ResetPasswordGuard implements CanActivate {
         throw new UnauthorizedException('This token is not valid for password reset.');
       }
 
-      request.user = payload;
+      request.user = {
+        id: payload.userId,
+        email: payload.email,
+      };
       return true;
     } catch (error) {
       if (error instanceof Error) {

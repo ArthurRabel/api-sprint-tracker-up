@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 import { AuthController } from '@/auth/auth.controller';
+import { AuthRepository } from '@/auth/auth.repository';
 import { AuthService } from '@/auth/auth.service';
 import { GoogleStrategy } from '@/auth/strategy/google.strategy';
 import { JwtStrategy } from '@/auth/strategy/jwt.strategy';
@@ -44,6 +45,7 @@ export class AuthModule {
         Logger,
         JwtStrategy,
         AuthService,
+        AuthRepository,
         {
           provide: OAUTH_STRATEGIES_TOKEN,
           useFactory: createOauthStrategies,

@@ -14,7 +14,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiCookieAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { AuthProvider } from '@prisma/client';
 import { Response } from 'express';
 
 import { AuthService } from '@/auth/auth.service';
@@ -30,6 +29,7 @@ import { IsEnabledAuthGuard } from '@/auth/guards/is-enable-oauth.guard';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { ResetPasswordGuard } from '@/auth/guards/reset-password.guard';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
+import { AuthProvider } from '@/auth/types/auth.types';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
 import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
 

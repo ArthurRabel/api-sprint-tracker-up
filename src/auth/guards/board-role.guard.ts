@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Role } from '@prisma/client';
 
 import { BOARD_ROLES_KEY } from '@/auth/strategy/decorators/board-rules.decorator';
+import { Role } from '@/board/types/board.types';
 import { PrismaService } from '@/prisma/prisma.service';
 
 import type { Request } from 'express';
@@ -56,12 +56,12 @@ export class BoardRoleGuard implements CanActivate {
     });
 
     if (!membership) {
-      throw new ForbiddenException('You do not have access to this board.');
+      throw new ForbiddenException('You do not have access to this board');
     }
 
-    const isAllowed = requiredRoles.includes(membership.role);
+    const isAllowed = requiredRoles.includes(membership.role as Role);
     if (!isAllowed) {
-      throw new ForbiddenException('Action not allowed for your role on this board.');
+      throw new ForbiddenException('Action not allowed for your role on this board');
     }
 
     return true;

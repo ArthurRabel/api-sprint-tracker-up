@@ -10,16 +10,16 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
-import { User, AuthProvider } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { Client } from 'ldapts';
 
 import { ChangePasswordDto, SignInDto, SignUpDto, VerifyResetCodeDto } from '@/auth/dto';
 import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
-import { PrismaService } from '@/prisma/prisma.service';
 import { UserService } from '@/user/user.service';
 
+import { AuthRepository } from './auth.repository';
 import { AccessTokenPayload } from './interface/jwt';
+import { User, AuthProvider } from './types/auth.types';
 
 import type { SearchOptions } from 'ldapts';
 
@@ -32,7 +32,7 @@ export class AuthService {
   private readonly jwtResetSecret: string;
 
   constructor(
-    private prisma: PrismaService,
+    private readonly authRepository: AuthRepository,
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
     private readonly jwtService: JwtService,
@@ -70,16 +70,12 @@ export class AuthService {
   }
 
   async signUp(dto: SignUpDto): Promise<{ accessToken: string }> {
-    const existingUserByEmail = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existingUserByEmail = await this.authRepository.findUserByEmail(dto.email);
     if (existingUserByEmail) {
       throw new ConflictException('Email already in use');
     }
 
-    const existingUserByUserName = await this.prisma.user.findUnique({
-      where: { userName: dto.userName },
-    });
+    const existingUserByUserName = await this.authRepository.findUserByUsername(dto.userName);
     if (existingUserByUserName) {
       throw new ConflictException('Username already in use');
     }
@@ -98,13 +94,11 @@ export class AuthService {
 
     this.eventEmitter.emit('user.registered', user);
 
-    return this.generateJwt(user);
+    return this.generateJwt(user as User);
   }
 
   async signIn(dto: SignInDto): Promise<{ accessToken: string }> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const user = await this.authRepository.findUserByEmail(dto.email);
 
     const isInvalidUser = !user || !user.passwordHash || user.authProvider !== AuthProvider.LOCAL;
 
@@ -125,12 +119,11 @@ export class AuthService {
     data: { providerId: string; email: string; name: string },
   ): Promise<{ accessToken: string }> {
     const { email, name, providerId } = data;
-    let user = await this.prisma.user.findUnique({
-      where: { email },
-    });
+    let user = await this.authRepository.findUserByEmail(email);
 
     if (!user) {
-      user = await this.userService.createUser({ email, name, providerId }, provider);
+      const createdUser = await this.userService.createUser({ email, name, providerId }, provider);
+      user = createdUser as User;
     }
 
     return this.generateJwt(user);
@@ -138,9 +131,7 @@ export class AuthService {
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await this.authRepository.findUserByEmail(email);
 
     if (!user) {
       return;
@@ -149,13 +140,7 @@ export class AuthService {
     const code = randomBytes(6).toString('base64');
     const expires = new Date(Date.now() + 1000 * 60 * 15);
 
-    await this.prisma.user.update({
-      where: { email },
-      data: {
-        resetToken: code,
-        resetTokenExpiresAt: expires,
-      },
-    });
+    await this.authRepository.updateUserResetToken(email, code, expires);
 
     this.eventEmitter.emit('user.forgotPassword', {
       email: user.email,
@@ -164,9 +149,7 @@ export class AuthService {
   }
 
   async verifyResetCode(verifyResetCodeDto: VerifyResetCodeDto): Promise<string> {
-    const user = await this.prisma.user.findFirst({
-      where: { resetToken: verifyResetCodeDto.code },
-    });
+    const user = await this.authRepository.findUserByResetToken(verifyResetCodeDto.code);
 
     if (!user) {
       throw new UnauthorizedException('Invalid or expired code.');
@@ -177,13 +160,7 @@ export class AuthService {
     }
 
     if (user.resetTokenExpiresAt && user.resetTokenExpiresAt < new Date()) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          resetToken: null,
-          resetTokenExpiresAt: null,
-        },
-      });
+      await this.authRepository.clearUserResetToken(user.id);
       throw new UnauthorizedException('Verification code expired.');
     }
 
@@ -198,13 +175,7 @@ export class AuthService {
       secret: this.jwtResetSecret,
     });
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken: null,
-        resetTokenExpiresAt: null,
-      },
-    });
+    await this.authRepository.clearUserResetToken(user.id);
 
     return resetJwtToken;
   }
@@ -212,9 +183,7 @@ export class AuthService {
   async validateUserFromToken(token: string): Promise<User | null> {
     try {
       const decoded = this.jwtService.verify<AccessTokenPayload>(token);
-      const user = await this.prisma.user.findUnique({
-        where: { id: decoded.sub },
-      });
+      const user = await this.authRepository.findUserById(decoded.sub);
       return user || null;
     } catch {
       return null;
@@ -223,21 +192,24 @@ export class AuthService {
 
   async resetPassword(userId: string, newPasswordPlain: string): Promise<void> {
     try {
+      const user = await this.authRepository.findUserById(userId);
+
+      if (!user) {
+        throw new BadRequestException('User not found.');
+      }
+
       const hashedPassword = await this.hashPassword(newPasswordPlain);
 
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { passwordHash: hashedPassword },
-      });
+      await this.authRepository.updateUserPassword(userId, hashedPassword);
+
+      this.eventEmitter.emit('user.changePassword', user);
     } catch (error) {
       throw new BadRequestException('Error resetting password: ' + String(error));
     }
   }
 
   async changePassword(id: string, dto: ChangePasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
+    const user = await this.authRepository.findUserById(id);
 
     if (!user) {
       throw new BadRequestException('User not found.');
@@ -256,10 +228,7 @@ export class AuthService {
 
     const hashedNewPassword = await argon2.hash(dto.newPassword);
 
-    await this.prisma.user.update({
-      where: { id },
-      data: { passwordHash: hashedNewPassword },
-    });
+    await this.authRepository.updateUserPassword(id, hashedNewPassword);
 
     this.eventEmitter.emit('user.changePassword', user);
   }
