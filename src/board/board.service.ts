@@ -8,7 +8,6 @@ import {
 import { BoardGateway } from '@/events/board.gateway';
 import { NotificationsGateway } from '@/events/notification.gateway';
 
-import { BOARD_ACTIONS, ERROR_MESSAGES, SUCCESS_MESSAGES } from './board.constants';
 import { BoardRepository } from './board.repository';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { InviteBoardDto } from './dto/invite-to-board.dto';
@@ -43,7 +42,7 @@ export class BoardService {
   async findOne(id: string): Promise<Board> {
     const board = await this.repository.findBoardById(id);
     if (!board) {
-      throw new NotFoundException(ERROR_MESSAGES.BOARD_NOT_FOUND);
+      throw new NotFoundException('Board not found');
     }
     return board;
   }
@@ -52,10 +51,10 @@ export class BoardService {
     const board = await this.repository.findBoardByIdWithMember(boardId, userId);
 
     if (!board) {
-      throw new NotFoundException(ERROR_MESSAGES.BOARD_NOT_FOUND);
+      throw new NotFoundException('Board not found');
     }
     if (board.members.length === 0) {
-      throw new ForbiddenException(ERROR_MESSAGES.NO_ACCESS);
+      throw new ForbiddenException('You do not have access to this board');
     }
 
     return board;
@@ -65,7 +64,7 @@ export class BoardService {
     await this.findOne(boardId);
     const updated = await this.repository.updateBoard(boardId, dto);
 
-    this.emitBoardEvent(boardId, BOARD_ACTIONS.UPDATED, {});
+    this.emitBoardEvent(boardId, 'updated', {});
 
     return updated;
   }
@@ -73,7 +72,7 @@ export class BoardService {
   async remove(boardId: string) {
     await this.findOne(boardId);
     await this.repository.deleteBoard(boardId);
-    return { message: SUCCESS_MESSAGES.BOARD_DELETED };
+    return { message: 'Board deleted successfully' };
   }
 
   async listMembers(boardId: string) {
@@ -100,7 +99,7 @@ export class BoardService {
     const board = await this.findOne(boardId);
 
     if (targetUserId === board.ownerId) {
-      throw new ForbiddenException(ERROR_MESSAGES.CANNOT_CHANGE_OWNER_ROLE);
+      throw new ForbiddenException('Cannot change the board owner role');
     }
 
     const targetMembership = await this.getMemberOrFail(boardId, targetUserId);
@@ -109,7 +108,7 @@ export class BoardService {
 
     const updated = await this.repository.updateBoardMemberRole(boardId, targetUserId, dto.role);
 
-    this.emitBoardEvent(boardId, BOARD_ACTIONS.MEMBER_ROLE_CHANGED, {
+    this.emitBoardEvent(boardId, 'member_role_changed', {
       memberUserId: targetUserId,
       newRole: dto.role,
       by: requesterId,
@@ -129,7 +128,7 @@ export class BoardService {
 
     this.notificationsGateway.sendNewNotificationToUser(recipient.id);
 
-    return { message: SUCCESS_MESSAGES.INVITE_SENT };
+    return { message: 'Invite sent successfully' };
   }
 
   async responseInvite(boardId: string, recipientId: string, dto: ResponseInviteBoardDto) {
@@ -139,18 +138,18 @@ export class BoardService {
 
     if (!dto.response) {
       await this.repository.deleteInvite(dto.idInvite);
-      return { message: SUCCESS_MESSAGES.INVITE_DECLINED };
+      return { message: 'Invite declined successfully' };
     }
 
     await this.acceptInvite(boardId, recipientId, invite, dto.idInvite);
 
-    return { message: SUCCESS_MESSAGES.INVITE_ACCEPTED };
+    return { message: 'Invite accepted successfully' };
   }
 
   private async getMemberOrFail(boardId: string, userId: string): Promise<BoardMember> {
     const member = await this.repository.findBoardMember(boardId, userId);
     if (!member) {
-      throw new NotFoundException(ERROR_MESSAGES.MEMBER_NOT_FOUND);
+      throw new NotFoundException('User is not a member of this board');
     }
     return member;
   }
@@ -171,7 +170,7 @@ export class BoardService {
 
   private async handleOwnerRemoval(boardId: string, ownerId: string, requesterId: string) {
     if (requesterId !== ownerId) {
-      throw new ForbiddenException(ERROR_MESSAGES.CANNOT_REMOVE_OWNER);
+      throw new ForbiddenException('Cannot remove the board owner');
     }
 
     const nextAdmin = await this.repository.findNextAdmin(boardId, requesterId);
@@ -179,7 +178,7 @@ export class BoardService {
     if (nextAdmin) {
       await this.transferOwnershipAndRemove(boardId, nextAdmin.userId, ownerId);
       this.emitMemberRemovedEvent(boardId, ownerId, requesterId);
-      return { message: SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED_ADMIN };
+      return { message: 'Ownership transferred to the oldest ADMIN and member removed' };
     }
 
     const nextMember = await this.repository.findNextMember(boardId, requesterId);
@@ -187,11 +186,13 @@ export class BoardService {
     if (nextMember) {
       await this.transferOwnershipAndRemove(boardId, nextMember.userId, ownerId, true);
       this.emitMemberRemovedEvent(boardId, ownerId, requesterId);
-      return { message: SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED_MEMBER };
+      return {
+        message: 'Ownership transferred to the oldest member (promoted to ADMIN) and user removed',
+      };
     }
 
     await this.repository.deleteBoard(boardId);
-    return { message: SUCCESS_MESSAGES.BOARD_DELETED_ONLY_OWNER };
+    return { message: 'Board deleted, you were the only eligible member (no ADMIN/MEMBER)' };
   }
 
   private async handleRegularMemberRemoval(
@@ -209,14 +210,14 @@ export class BoardService {
 
     this.emitMemberRemovedEvent(boardId, memberUserId, requesterId);
 
-    return { message: SUCCESS_MESSAGES.MEMBER_REMOVED };
+    return { message: 'Member removed successfully' };
   }
 
   private async validateAdminPermission(boardId: string, userId: string) {
     const membership = await this.repository.findBoardMember(boardId, userId);
 
     if (membership?.role !== Role.ADMIN) {
-      throw new ForbiddenException(ERROR_MESSAGES.ONLY_ADMINS_CAN_REMOVE);
+      throw new ForbiddenException('Only administrators can remove other members');
     }
   }
 
@@ -225,7 +226,7 @@ export class BoardService {
       const adminCount = await this.repository.countAdmins(boardId);
 
       if (adminCount <= 1) {
-        throw new BadRequestException(ERROR_MESSAGES.CANNOT_DEMOTE_ONLY_ADMIN);
+        throw new BadRequestException('Cannot demote the only ADMIN of the board');
       }
     }
   }
@@ -234,7 +235,7 @@ export class BoardService {
     const user = await this.repository.findUserByUsername(userName);
 
     if (!user) {
-      throw new NotFoundException(ERROR_MESSAGES.RECIPIENT_NOT_FOUND);
+      throw new NotFoundException('Recipient not found');
     }
 
     return user;
@@ -244,13 +245,13 @@ export class BoardService {
     const existingInvite = await this.repository.findPendingInvite(boardId, userId);
 
     if (existingInvite) {
-      throw new BadRequestException(ERROR_MESSAGES.PENDING_INVITE_EXISTS);
+      throw new BadRequestException('There is already a pending invite for this user');
     }
 
     const isMember = await this.repository.findBoardMember(boardId, userId);
 
     if (isMember) {
-      throw new BadRequestException(ERROR_MESSAGES.ALREADY_MEMBER);
+      throw new BadRequestException('This user is already a member of the board');
     }
   }
 
@@ -258,7 +259,7 @@ export class BoardService {
     const invite = await this.repository.findInvite(inviteId);
 
     if (!invite) {
-      throw new NotFoundException(ERROR_MESSAGES.INVITE_NOT_FOUND);
+      throw new NotFoundException('Invite not found');
     }
 
     return invite;
@@ -266,7 +267,7 @@ export class BoardService {
 
   private validateInviteRecipient(invite: Invite, recipientId: string) {
     if (invite.recipientId !== recipientId) {
-      throw new ForbiddenException(ERROR_MESSAGES.NO_PERMISSION_FOR_INVITE);
+      throw new ForbiddenException('You do not have permission to accept this invite');
     }
   }
 
@@ -294,7 +295,7 @@ export class BoardService {
   }
 
   private emitMemberRemovedEvent(boardId: string, memberUserId: string, by: string) {
-    this.emitBoardEvent(boardId, BOARD_ACTIONS.MEMBER_REMOVED, {
+    this.emitBoardEvent(boardId, 'member_removed', {
       memberUserId,
       by,
     });
