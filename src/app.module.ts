@@ -11,6 +11,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AnalysisModule } from '@/analysis/analysis.module';
 import { AuthModule } from '@/auth/auth.module';
 import { BoardModule } from '@/board/board.module';
+import { EmailModule } from '@/email/email.module';
 import { EventsModule } from '@/events/events.module';
 import { HealthModule } from '@/health/health.module';
 import { ListModule } from '@/list/list.module';
@@ -73,6 +74,7 @@ import { StorageModule } from './storage/storage.module';
     AnalysisModule,
     ImportsModule,
     StorageModule,
+    EmailModule,
   ],
   providers: [
     {
