@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
 
-import { EventsModule } from '@/events/events.module';
 import { ListService } from '@/list/list.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 
 import { ListController } from './list.controller';
+import { ListRepository } from './list.repository';
 
 @Module({
-  providers: [ListService],
+  providers: [ListService, ListRepository],
   controllers: [ListController],
-  imports: [EventsModule, PrismaModule],
+  imports: [PrismaModule],
   exports: [ListService],
 })
 export class ListModule {}

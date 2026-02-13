@@ -1,10 +1,10 @@
 import { Controller, Get, Post, Body, Param, Patch, Delete, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
 
 import { BoardRoleGuard } from '@/auth/guards/board-role.guard';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { BoardRoles } from '@/auth/strategy/decorators/board-rules.decorator';
+import { Role } from '@/board/types/board.types';
 import { ListService } from '@/list/list.service';
 
 import { CreateListDto } from './dto/create-list.dto';
