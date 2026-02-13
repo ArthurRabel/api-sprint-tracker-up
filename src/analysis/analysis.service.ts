@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, Status } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { endOfDay } from 'date-fns';
 
-import { PrismaService } from '@/prisma/prisma.service';
+import { Status } from '@/common/enums/task-status.enum';
 
+import { AnalysisRepository } from './analysis.repository';
 import { BasicSummaryResponse, StatusCount } from './dto/get-basic-summary.dto';
 import {
   CompletedSummaryResponse,
@@ -13,7 +14,8 @@ import {
 
 @Injectable()
 export class AnalysisService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: AnalysisRepository) {}
+
   async getCompletedTasksSummary(
     boardId: string,
     query: GetCompletedSummaryDto,
@@ -33,18 +35,13 @@ export class AnalysisService {
       },
       ...(assignedToId ? { assignedToId } : {}),
       list: {
-        boardId: boardId,
+        boardId,
       },
     };
 
-    const completedTasks = await this.prisma.task.findMany({
-      where: where,
-      select: {
-        completedAt: true,
-      },
-    });
+    const completedTasks = await this.repository.findCompletedTasks(where);
 
-    const dailyCountsMap: { [key: string]: number } = {};
+    const dailyCountsMap: Record<string, number> = {};
 
     completedTasks.forEach((task) => {
       if (task.completedAt) {
@@ -58,36 +55,24 @@ export class AnalysisService {
       count: dailyCountsMap[date],
     }));
 
-    const result = {
+    return {
       total: completedTasks.length,
       dailyCounts: dailyCounts.sort((a, b) => a.date.localeCompare(b.date)),
     };
-
-    return result;
   }
 
   async getBasicSummary(boardId: string): Promise<BasicSummaryResponse> {
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        list: {
-          boardId: boardId,
-        },
-        isArchived: false,
-      },
-      select: {
-        status: true,
-      },
-    });
+    const tasks = await this.repository.findTasksByBoard(boardId);
 
     const total = tasks.length;
-    const statusCountMap: { [key: string]: number } = {
+    const statusCountMap: Record<string, number> = {
       TODO: 0,
       IN_PROGRESS: 0,
       DONE: 0,
     };
 
     tasks.forEach((task) => {
-      if (task.status !== Status.ARCHIVED) {
+      if (task.status !== (Status.ARCHIVED as string)) {
         statusCountMap[task.status] = (statusCountMap[task.status] || 0) + 1;
       }
     });

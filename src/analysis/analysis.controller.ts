@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
 
 import { BoardRoleGuard } from '@/auth/guards/board-role.guard';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { BoardRoles } from '@/auth/strategy/decorators/board-rules.decorator';
+import { Role } from '@/board/types/board.types';
 
 import { GetCompletedTasksSummaryDocs, GetBasicSummaryDocs } from './analysis.docs';
 import { AnalysisService } from './analysis.service';
