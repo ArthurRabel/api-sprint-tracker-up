@@ -1,11 +1,11 @@
 import { Controller, Post, Get, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
 
 import { BoardRoleGuard } from '@/auth/guards/board-role.guard';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { BoardRoles } from '@/auth/strategy/decorators/board-rules.decorator';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
+import { Role } from '@/board/types/board.types';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
 
 import { CreateTaskDto } from './dto/create-task.dto';
