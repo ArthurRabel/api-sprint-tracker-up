@@ -3,7 +3,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { BoardService } from '@/board/board.service';
 import { AuthProvider, Role, User } from '@/common/interfaces';
 
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,7 +14,6 @@ describe('UserService', () => {
   let service: UserService;
   let repository: DeepMockProxy<UserRepository>;
   let eventEmitter: DeepMockProxy<EventEmitter2>;
-  let boardService: DeepMockProxy<BoardService>;
 
   const mockUserId = '6217183c-bc01-4bca-8aa0-271b7f9761c5';
 
@@ -40,14 +38,12 @@ describe('UserService', () => {
   beforeEach(async () => {
     repository = mockDeep<UserRepository>();
     eventEmitter = mockDeep<EventEmitter2>();
-    boardService = mockDeep<BoardService>();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
         { provide: UserRepository, useValue: repository },
         { provide: EventEmitter2, useValue: eventEmitter },
-        { provide: BoardService, useValue: boardService },
       ],
     }).compile();
 
@@ -192,34 +188,15 @@ describe('UserService', () => {
   });
 
   describe('deleteAccount', () => {
-    it('should remove user from all boards and delete account', async () => {
+    it('should emit user.deleted event and delete account', async () => {
       const mockUser = createMockUser();
-      const memberships = [{ boardId: 'board-1' }, { boardId: 'board-2' }];
       repository.findUserById.mockResolvedValue(mockUser);
-      repository.findUserBoardMemberships.mockResolvedValue(memberships);
-      boardService.removeMember.mockResolvedValue({ message: 'Member removed successfully' });
       repository.deleteUser.mockResolvedValue(undefined);
 
       const result = await service.deleteAccount(mockUserId);
 
       expect(repository.findUserById).toHaveBeenCalledWith(mockUserId);
-      expect(repository.findUserBoardMemberships).toHaveBeenCalledWith(mockUserId);
-      expect(boardService.removeMember).toHaveBeenCalledTimes(2);
-      expect(boardService.removeMember).toHaveBeenCalledWith('board-1', mockUserId, mockUserId);
-      expect(boardService.removeMember).toHaveBeenCalledWith('board-2', mockUserId, mockUserId);
-      expect(repository.deleteUser).toHaveBeenCalledWith(mockUserId);
-      expect(result).toEqual({ message: 'Conta e dados associados excluídos com sucesso' });
-    });
-
-    it('should delete account when user has no board memberships', async () => {
-      const mockUser = createMockUser();
-      repository.findUserById.mockResolvedValue(mockUser);
-      repository.findUserBoardMemberships.mockResolvedValue([]);
-      repository.deleteUser.mockResolvedValue(undefined);
-
-      const result = await service.deleteAccount(mockUserId);
-
-      expect(boardService.removeMember).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith('user.deleted', mockUser);
       expect(repository.deleteUser).toHaveBeenCalledWith(mockUserId);
       expect(result).toEqual({ message: 'Conta e dados associados excluídos com sucesso' });
     });
@@ -228,7 +205,7 @@ describe('UserService', () => {
       repository.findUserById.mockResolvedValue(null);
 
       await expect(service.deleteAccount('nonexistent')).rejects.toThrow(NotFoundException);
-      expect(repository.findUserBoardMemberships).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
       expect(repository.deleteUser).not.toHaveBeenCalled();
     });
   });
