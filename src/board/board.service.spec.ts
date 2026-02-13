@@ -1,9 +1,7 @@
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
-
-import { BoardGateway } from '@/events/board.gateway';
-import { NotificationsGateway } from '@/events/notification.gateway';
 
 import { BoardRepository } from './board.repository';
 import { BoardService } from './board.service';
@@ -17,8 +15,7 @@ import { Board, BoardMember, Invite, Role, User } from './types/board.types';
 describe('BoardService', () => {
   let service: BoardService;
   let repository: DeepMockProxy<BoardRepository>;
-  let notificationsGateway: DeepMockProxy<NotificationsGateway>;
-  let boardGateway: DeepMockProxy<BoardGateway>;
+  let eventEmitter: DeepMockProxy<EventEmitter2>;
 
   const mockUserId = '6217183c-bc01-4bca-8aa0-271b7f9761c5';
   const mockBoardId = 'board-123';
@@ -67,15 +64,13 @@ describe('BoardService', () => {
 
   beforeEach(async () => {
     repository = mockDeep<BoardRepository>();
-    notificationsGateway = mockDeep<NotificationsGateway>();
-    boardGateway = mockDeep<BoardGateway>();
+    eventEmitter = mockDeep<EventEmitter2>();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BoardService,
         { provide: BoardRepository, useValue: repository },
-        { provide: NotificationsGateway, useValue: notificationsGateway },
-        { provide: BoardGateway, useValue: boardGateway },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 
@@ -197,8 +192,8 @@ describe('BoardService', () => {
 
       expect(repository.findBoardById).toHaveBeenCalledWith(mockBoardId);
       expect(repository.updateBoard).toHaveBeenCalledWith(mockBoardId, dto);
-      expect(boardGateway.emitModifiedInBoard).toHaveBeenCalledWith(
-        mockBoardId,
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'board.modified',
         expect.objectContaining({
           boardId: mockBoardId,
           action: 'updated',
@@ -277,7 +272,7 @@ describe('BoardService', () => {
         const result = await service.removeMember(mockBoardId, memberToRemove, mockUserId);
 
         expect(repository.deleteBoardMember).toHaveBeenCalledWith(mockBoardId, memberToRemove);
-        expect(boardGateway.emitModifiedInBoard).toHaveBeenCalled();
+        expect(eventEmitter.emit).toHaveBeenCalled();
         expect(result).toEqual({ message: 'Member removed successfully' });
       });
 
@@ -425,7 +420,7 @@ describe('BoardService', () => {
         targetUserId,
         dto.role,
       );
-      expect(boardGateway.emitModifiedInBoard).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalled();
       expect(result).toEqual(updatedMember);
     });
 
@@ -500,7 +495,7 @@ describe('BoardService', () => {
         mockUser.email,
         dto.role,
       );
-      expect(notificationsGateway.sendNewNotificationToUser).toHaveBeenCalledWith(mockUser.id);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('notification.new', { userId: mockUser.id });
       expect(result).toEqual({ message: 'Invite sent successfully' });
     });
 

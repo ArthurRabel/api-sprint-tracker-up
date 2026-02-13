@@ -4,9 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-
-import { BoardGateway } from '@/events/board.gateway';
-import { NotificationsGateway } from '@/events/notification.gateway';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { BoardRepository } from './board.repository';
 import { CreateBoardDto } from './dto/create-board.dto';
@@ -20,8 +18,7 @@ import { Board, BoardMember, Invite, Role } from './types/board.types';
 export class BoardService {
   constructor(
     private readonly repository: BoardRepository,
-    private readonly notificationsGateway: NotificationsGateway,
-    private readonly boardGateway: BoardGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(ownerId: string, dto: CreateBoardDto) {
@@ -126,7 +123,7 @@ export class BoardService {
 
     await this.repository.createInvite(boardId, senderId, recipient.id, recipient.email, dto.role);
 
-    this.notificationsGateway.sendNewNotificationToUser(recipient.id);
+    this.eventEmitter.emit('notification.new', { userId: recipient.id });
 
     return { message: 'Invite sent successfully' };
   }
@@ -291,7 +288,7 @@ export class BoardService {
       ...additionalData,
       at: new Date().toISOString(),
     };
-    this.boardGateway.emitModifiedInBoard(boardId, payload);
+    this.eventEmitter.emit('board.modified', payload);
   }
 
   private emitMemberRemovedEvent(boardId: string, memberUserId: string, by: string) {

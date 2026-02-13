@@ -1,8 +1,6 @@
-export enum Role {
-  ADMIN = 'ADMIN',
-  MEMBER = 'MEMBER',
-  OBSERVER = 'OBSERVER',
-}
+import { Role } from '@/common/interfaces';
+
+export { Role };
 
 export enum BoardVisibility {
   PUBLIC = 'PUBLIC',
