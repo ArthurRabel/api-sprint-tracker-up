@@ -10,7 +10,7 @@ import { parser } from 'stream-json';
 import { pick } from 'stream-json/filters/Pick';
 import { streamArray } from 'stream-json/streamers/StreamArray';
 
-import { TaskStatus } from '@/common/enums/task-status.enum';
+import { Status } from '@/common/enums/task-status.enum';
 import { CreateListDto } from '@/list/dto/create-list.dto';
 import { ListService } from '@/list/list.service';
 import { StorageService } from '@/storage/storage.service';
@@ -183,7 +183,7 @@ export class ImportsProcessor extends WorkerHost {
           listId: mappedListId,
           externalId: data.value.id,
           title: data.value.name,
-          status: data.value.due ? TaskStatus.TODO : TaskStatus.DONE,
+          status: data.value.due ? Status.TODO : Status.DONE,
           description: data.value.desc,
           isArchived: data.value.closed,
         };

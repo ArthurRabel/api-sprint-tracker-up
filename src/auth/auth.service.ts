@@ -94,7 +94,7 @@ export class AuthService {
 
     this.eventEmitter.emit('user.registered', user);
 
-    return this.generateJwt(user as User);
+    return this.generateJwt(user);
   }
 
   async signIn(dto: SignInDto): Promise<{ accessToken: string }> {
@@ -123,7 +123,7 @@ export class AuthService {
 
     if (!user) {
       const createdUser = await this.userService.createUser({ email, name, providerId }, provider);
-      user = createdUser as User;
+      user = createdUser;
     }
 
     return this.generateJwt(user);
