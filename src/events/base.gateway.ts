@@ -6,11 +6,11 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { User } from '@prisma/client';
 import * as cookie from 'cookie';
 import { Server, Socket } from 'socket.io';
 
 import { AuthService } from '@/auth/auth.service';
+import { User } from '@/common/interfaces';
 
 @WebSocketGateway({
   cors: {
