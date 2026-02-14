@@ -1,0 +1,56 @@
+name: CI - New Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  e2e-tests:
+    name: Test E2E - Node ${{ matrix.node-version }} with Postgres v15
+    runs-on: ubuntu-latest
+    
+    env:
+      DB_USER: ${{ vars.DB_USER || 'postgres' }}
+      DB_PASS: ${{ secrets.DB_PASSWORD }}
+      DB_NAME: ${{ vars.DB_NAME || 'test_db' }}
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASS }}
+          POSTGRES_DB: ${{ env.DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar Migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASS }}@${{ env.DB_HOST }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}
+
+      - name: Rodar E2E
+        run: npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASS }}@${{ env.DB_HOST }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}
