@@ -62,7 +62,7 @@ async function bootstrap() {
     type: VersioningType.URI,
   });
 
-  const docsPath = path.join(process.cwd(), 'INTRODUCTION.md');
+  const docsPath = path.join(process.cwd(), 'docs', 'INTRODUCTION.md');
   let description = 'Sprint Tracker API documentation by Arthur Rabelo, fork from BayArea.';
 
   try {
@@ -74,7 +74,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('API docs - Sprint Tracker Up')
     .setDescription(description)
-    .addCookieAuth('sprinttacker-session')
+    .addCookieAuth('sprinttracker-session')
     .setExternalDoc(
       'Additional documentation',
       'https://github.com/ArthurRabel/api-sprint-tracker-up',
@@ -105,7 +105,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 
   SwaggerModule.setup('docs', app, document, {
-    customSiteTitle: 'Sprint Tacker API - IESB',
+    customSiteTitle: 'Sprint Tracker UP',
     customCss: `
       .renderedMarkdown h1, .renderedMarkdown h2{
         font-size: 1.1rem;
