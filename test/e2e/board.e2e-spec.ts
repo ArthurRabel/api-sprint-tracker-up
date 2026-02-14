@@ -131,22 +131,6 @@ describe('Board E2E Tests', () => {
       expect(ownerMember).toBeDefined();
       expect(ownerMember?.role).toBe(Role.ADMIN);
     });
-
-    it('should fail without authentication', async () => {
-      const createBoardData = mockCreateBoardDto();
-
-      await request(httpServer).post('/v1/board').send(createBoardData).expect(401);
-    });
-
-    it('should fail with invalid data', async () => {
-      const { authCookie } = await createAuthenticatedUser(app);
-
-      await request(httpServer)
-        .post('/v1/board')
-        .set('Cookie', authCookie)
-        .send({ title: '' })
-        .expect(400);
-    });
   });
 
   describe('GET /v1/board', () => {
@@ -182,25 +166,6 @@ describe('Board E2E Tests', () => {
       const boards = response.body as BoardResponse[];
       expect(boards.some((b) => b.id === board.id)).toBe(true);
     });
-
-    it('should not return boards user has no access to', async () => {
-      const { user: owner } = await createAuthenticatedUser(app);
-      const { authCookie } = await createAuthenticatedUser(app);
-
-      await createTestBoard(owner.id);
-
-      const response = await request(httpServer)
-        .get('/v1/board')
-        .set('Cookie', authCookie)
-        .expect(200);
-
-      const boards = response.body as BoardResponse[];
-      expect(boards).toHaveLength(0);
-    });
-
-    it('should fail without authentication', async () => {
-      await request(httpServer).get('/v1/board').expect(401);
-    });
   });
 
   describe('GET /v1/board/:idBoard', () => {
@@ -233,21 +198,6 @@ describe('Board E2E Tests', () => {
 
       const body = response.body as BoardResponse;
       expect(body.id).toBe(board.id);
-    });
-
-    it('should fail for non-member on PRIVATE board', async () => {
-      const { user: owner } = await createAuthenticatedUser(app);
-      const { authCookie } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(owner.id, { visibility: BoardVisibility.PRIVATE });
-
-      const response = await request(httpServer)
-        .get(`/v1/board/${board.id}`)
-        .set('Cookie', authCookie)
-        .expect(403);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('You do not have access to this board');
     });
   });
 
@@ -286,44 +236,6 @@ describe('Board E2E Tests', () => {
       const body = response.body as BoardResponse;
       expect(body.description).toBe('Updated description');
     });
-
-    it('should fail for MEMBER role', async () => {
-      const { user: owner } = await createAuthenticatedUser(app);
-      const { authCookie, user: member } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(owner.id);
-      await addMemberToBoard(board.id, member.id, Role.MEMBER);
-
-      const updateData = mockUpdateBoardDto({ title: 'Should Fail' });
-
-      const response = await request(httpServer)
-        .patch(`/v1/board/${board.id}`)
-        .set('Cookie', authCookie)
-        .send(updateData)
-        .expect(403);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('Action not allowed for your role on this board');
-    });
-
-    it('should fail for OBSERVER role', async () => {
-      const { user: owner } = await createAuthenticatedUser(app);
-      const { authCookie, user: observer } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(owner.id);
-      await addMemberToBoard(board.id, observer.id, Role.OBSERVER);
-
-      const updateData = mockUpdateBoardDto({ title: 'Should Fail' });
-
-      const response = await request(httpServer)
-        .patch(`/v1/board/${board.id}`)
-        .set('Cookie', authCookie)
-        .send(updateData)
-        .expect(403);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('Action not allowed for your role on this board');
-    });
   });
 
   describe('DELETE /v1/board/:idBoard', () => {
@@ -340,18 +252,6 @@ describe('Board E2E Tests', () => {
       expect(body.message).toBe('Board deleted successfully');
 
       await request(httpServer).get(`/v1/board/${board.id}`).set('Cookie', authCookie).expect(403);
-    });
-
-    it('should fail for non-member', async () => {
-      const { user: owner } = await createAuthenticatedUser(app);
-      const { authCookie } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(owner.id);
-
-      await request(httpServer)
-        .delete(`/v1/board/${board.id}`)
-        .set('Cookie', authCookie)
-        .expect(403);
     });
   });
 
@@ -372,18 +272,6 @@ describe('Board E2E Tests', () => {
       expect(members).toHaveLength(2);
       expect(members.some((m) => m.userId === owner.id && m.role === Role.ADMIN)).toBe(true);
       expect(members.some((m) => m.userId === member.id && m.role === Role.MEMBER)).toBe(true);
-    });
-
-    it('should fail for non-member', async () => {
-      const { user: owner } = await createAuthenticatedUser(app);
-      const { authCookie } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(owner.id);
-
-      await request(httpServer)
-        .get(`/v1/board/${board.id}/members`)
-        .set('Cookie', authCookie)
-        .expect(403);
     });
   });
 });

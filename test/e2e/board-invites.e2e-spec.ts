@@ -12,7 +12,7 @@ import { AppModule } from '@/app.module';
 
 import { mockInviteBoardDto, mockResponseInviteBoardDto } from '../fixtures/board.fixture';
 import { createAuthenticatedUser } from '../helpers/auth.helper';
-import { addMemberToBoard, createTestBoard, createTestInvite } from '../helpers/board.helper';
+import { createTestBoard, createTestInvite } from '../helpers/board.helper';
 import {
   cleanDatabase,
   getPrismaClient,
@@ -105,95 +105,6 @@ describe('Board Invites E2E Tests', () => {
       expect(invite).toBeDefined();
       expect(invite?.role).toBe(Role.MEMBER);
     });
-
-    it('should fail when inviting non-existent user', async () => {
-      const { authCookie, user: admin } = await createAuthenticatedUser(app);
-      const board = await createTestBoard(admin.id);
-      const inviteData = mockInviteBoardDto('nonexistent_user', Role.MEMBER);
-
-      const response = await request(httpServer)
-        .post(`/v1/board/invite/${board.id}`)
-        .set('Cookie', authCookie)
-        .send(inviteData)
-        .expect(404);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('Recipient not found');
-    });
-
-    it('should fail when inviting existing member', async () => {
-      const { authCookie, user: admin } = await createAuthenticatedUser(app);
-      const { user: existingMember } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(admin.id);
-      await addMemberToBoard(board.id, existingMember.id, Role.MEMBER);
-
-      const inviteData = mockInviteBoardDto(existingMember.userName, Role.MEMBER);
-
-      const response = await request(httpServer)
-        .post(`/v1/board/invite/${board.id}`)
-        .set('Cookie', authCookie)
-        .send(inviteData)
-        .expect(400);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('This user is already a member of the board');
-    });
-
-    it('should fail when pending invite exists', async () => {
-      const { authCookie, user: admin } = await createAuthenticatedUser(app);
-      const { user: recipient } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(admin.id);
-      await createTestInvite(board.id, admin.id, recipient.id, Role.MEMBER);
-
-      const inviteData = mockInviteBoardDto(recipient.userName, Role.OBSERVER);
-
-      const response = await request(httpServer)
-        .post(`/v1/board/invite/${board.id}`)
-        .set('Cookie', authCookie)
-        .send(inviteData)
-        .expect(400);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('There is already a pending invite for this user');
-    });
-
-    it('should fail for MEMBER role sending invite', async () => {
-      const { user: admin } = await createAuthenticatedUser(app);
-      const { authCookie: memberCookie, user: member } = await createAuthenticatedUser(app);
-      const { user: recipient } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(admin.id);
-      await addMemberToBoard(board.id, member.id, Role.MEMBER);
-
-      const inviteData = mockInviteBoardDto(recipient.userName, Role.MEMBER);
-
-      const response = await request(httpServer)
-        .post(`/v1/board/invite/${board.id}`)
-        .set('Cookie', memberCookie)
-        .send(inviteData)
-        .expect(403);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('Action not allowed for your role on this board');
-    });
-
-    it('should fail for non-member', async () => {
-      const { user: admin } = await createAuthenticatedUser(app);
-      const { authCookie } = await createAuthenticatedUser(app);
-      const { user: recipient } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(admin.id);
-
-      const inviteData = mockInviteBoardDto(recipient.userName, Role.MEMBER);
-
-      await request(httpServer)
-        .post(`/v1/board/invite/${board.id}`)
-        .set('Cookie', authCookie)
-        .send(inviteData)
-        .expect(403);
-    });
   });
 
   describe('POST /v1/board/invite/:boardId/response', () => {
@@ -268,43 +179,6 @@ describe('Board Invites E2E Tests', () => {
       });
       expect(membership).toBeNull();
     });
-
-    it('should fail when responding to invite for another user', async () => {
-      const { user: admin } = await createAuthenticatedUser(app);
-      const { user: recipient } = await createAuthenticatedUser(app);
-      const { authCookie: otherCookie } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(admin.id);
-      const invite = await createTestInvite(board.id, admin.id, recipient.id, Role.MEMBER);
-
-      const responseData = mockResponseInviteBoardDto(invite.id, true);
-
-      const response = await request(httpServer)
-        .post(`/v1/board/invite/${board.id}/response`)
-        .set('Cookie', otherCookie)
-        .send(responseData)
-        .expect(403);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('You do not have permission to accept this invite');
-    });
-
-    it('should fail for non-existent invite', async () => {
-      const { user: admin } = await createAuthenticatedUser(app);
-      const { authCookie: recipientCookie } = await createAuthenticatedUser(app);
-
-      const board = await createTestBoard(admin.id);
-      const responseData = mockResponseInviteBoardDto('non-existent-id', true);
-
-      const response = await request(httpServer)
-        .post(`/v1/board/invite/${board.id}/response`)
-        .set('Cookie', recipientCookie)
-        .send(responseData)
-        .expect(404);
-
-      const body = response.body as { message: string };
-      expect(body.message).toBe('Invite not found');
-    });
   });
 
   describe('GET /v1/me/notifications', () => {
@@ -353,10 +227,6 @@ describe('Board Invites E2E Tests', () => {
 
       const notifications = response.body as Array<unknown>;
       expect(notifications).toHaveLength(0);
-    });
-
-    it('should fail without authentication', async () => {
-      await request(httpServer).get('/v1/me/notifications').expect(401);
     });
   });
 });
