@@ -7,23 +7,21 @@ on:
 
 jobs:
   e2e-tests:
-    name: Test E2E - Node ${{ matrix.node-version }} with Postgres v15
-    runs-on: ubuntu-latest
-    
-    env:
-      DB_USER: ${{ vars.DB_USER || 'postgres' }}
-      DB_PASS: ${{ secrets.DB_PASSWORD }}
-      DB_NAME: ${{ vars.DB_NAME || 'test_db' }}
-      DB_HOST: localhost
-      DB_PORT: 5432
+    name: Test E2E - Node ${{ matrix.node-version }} with Postgres v18
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        os: [ubuntu-latest, windows-latest] 
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:18-alpine
         env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASS }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
+          POSTGRES_USER: ${{ vars.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ vars.DB_NAME }}
         ports:
           - 5432:5432
         options: >-
@@ -48,9 +46,9 @@ jobs:
       - name: Rodar Migrations
         run: npx prisma migrate deploy
         env:
-          DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASS }}@${{ env.DB_HOST }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}
+          DATABASE_URL: postgresql://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD }}@localhost:5432/${{ vars.DB_NAME || 'test_db' }}
 
       - name: Rodar E2E
         run: npm run test:e2e
         env:
-          DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASS }}@${{ env.DB_HOST }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}
+          DATABASE_URL: postgresql://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD }}@localhost:5432/${{ vars.DB_NAME || 'test_db' }}
