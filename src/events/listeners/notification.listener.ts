@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { NotificationsGateway } from './notification.gateway';
+import { NotificationsGateway } from '../notification.gateway';
 
 interface NewNotificationPayload {
   userId: string;

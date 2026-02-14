@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { EmailService } from '@/email/email.service';
 
-import { EmailListener } from './email.listener';
+import { EmailListener } from './listeners/email.listener';
 import { EmailProcessor } from './email.processor';
 import { EmailTransporterProvider } from './transporters/email.transporter.provider';
 

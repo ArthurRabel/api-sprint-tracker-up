@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { BoardGateway } from './board.gateway';
+import { BoardGateway } from '../board.gateway';
 
 interface BoardModifiedPayload {
   boardId: string;
