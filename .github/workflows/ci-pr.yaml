@@ -1,34 +1,91 @@
-name: CI - Pull Request
+name: CI Pipeline
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
-  build-and-test:
-    name: Build e Test - Node ${{ matrix.node-version }}
+  unit-tests:
+    name: Unit Test - Node 24.x
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [24.x]
-        os: [ubuntu-latest, windows-latest] 
-
     steps:
-      - name: Checkout do código
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          node-version: 24.x
 
-      - name: Instalar dependências
+      - name: Cache node modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Rodar lint
+      - name: Run lint
         run: npm run lint
 
-      - name: Rodar testes
+      - name: Run tests
         run: npm run test
+    
+  e2e-tests:
+    name: E2E Test - Node 24.x with Postgres 18
+    needs: unit-tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ${{ vars.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ vars.DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ${{ vars.DB_USER }}"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://${{ vars.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/${{ vars.DB_NAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Cache node modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Run E2E tests
+        run: npm run test:e2e
