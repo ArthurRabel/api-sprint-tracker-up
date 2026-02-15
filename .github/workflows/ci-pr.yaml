@@ -43,6 +43,7 @@ jobs:
     name: E2E Test - Node 24.x with Postgres 18
     needs: unit-tests
     runs-on: ubuntu-latest
+    environment: "Ci environment"
 
     services:
       postgres:
