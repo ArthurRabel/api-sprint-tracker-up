@@ -62,6 +62,9 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://${{ vars.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/${{ vars.DB_NAME }}
+      JWT_SECRET: ${{ vars.JWT_SECRET }}
+      JWT_RESET_SECRET: ${{ vars.JWT_RESET_SECRET }}
+      FRONTEND_URL: ${{ vars.FRONTEND_URL }}
 
     steps:
       - name: Checkout code
