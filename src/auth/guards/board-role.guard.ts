@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 
 import { BOARD_ROLES_KEY } from '@/auth/strategy/decorators/board-rules.decorator';
 import { Role } from '@/board/types/board.types';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 import type { Request } from 'express';
 

@@ -11,9 +11,9 @@ import { pick } from 'stream-json/filters/Pick';
 import { streamArray } from 'stream-json/streamers/StreamArray';
 
 import { Status } from '@/common/enums/task-status.enum';
+import { AwsS3Service } from '@/infrastructure/awsS3/awsS3.service';
 import { CreateListDto } from '@/list/dto/create-list.dto';
 import { ListService } from '@/list/list.service';
-import { StorageService } from '@/storage/storage.service';
 import { CreateTaskDto } from '@/task/dto/create-task.dto';
 import { TaskService } from '@/task/task.service';
 
@@ -52,11 +52,11 @@ interface ImportResult {
 }
 
 @Processor('import-queue')
-export class ImportsProcessor extends WorkerHost {
-  private logger = new Logger('ImportsProcessor');
+export class TrelloProcessor extends WorkerHost {
+  private logger = new Logger('TrelloProcessor');
   private readonly isDebug: boolean;
   constructor(
-    private readonly storageService: StorageService,
+    private readonly AwsS3Service: AwsS3Service,
     private readonly configService: ConfigService,
     private readonly listService: ListService,
     private readonly taskService: TaskService,
@@ -72,12 +72,12 @@ export class ImportsProcessor extends WorkerHost {
 
     this.logger.log(`[Worker] 1/2: Processing lists...`);
 
-    const listStreamS3 = await this.storageService.getFileStream(bucket, fileKey);
+    const listStreamS3 = await this.AwsS3Service.getFileStream(bucket, fileKey);
     await this.processLists(listStreamS3, boardId);
 
     this.logger.log(`[Worker] 2/2: Processing tasks...`);
 
-    const cardStreamS3 = await this.storageService.getFileStream(bucket, fileKey);
+    const cardStreamS3 = await this.AwsS3Service.getFileStream(bucket, fileKey);
     await this.processTasks(cardStreamS3, boardId, userId);
 
     return { status: 'completed' };

@@ -7,7 +7,7 @@ import {
 import { Socket } from 'socket.io';
 
 import { AuthService } from '@/auth/auth.service';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 import { BaseGateway } from './base.gateway';
 

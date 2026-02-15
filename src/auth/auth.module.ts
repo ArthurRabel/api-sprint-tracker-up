@@ -9,7 +9,7 @@ import { AuthService } from '@/auth/auth.service';
 import { GoogleStrategy } from '@/auth/strategy/google.strategy';
 import { JwtStrategy } from '@/auth/strategy/jwt.strategy';
 import { MicrosoftStrategy } from '@/auth/strategy/microsoft.strategy';
-import { PrismaModule } from '@/prisma/prisma.module';
+import { PrismaModule } from '@/infrastructure/prisma/prisma.module';
 import { UserModule } from '@/user/user.module';
 
 export const OAUTH_STRATEGIES_TOKEN = 'OAUTH_STRATEGIES';

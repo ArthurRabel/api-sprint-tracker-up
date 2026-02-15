@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
-import * as packageJson from '../../package.json';
+import * as packageJson from '../../../package.json';
 
 @Injectable()
 export class HealthService {

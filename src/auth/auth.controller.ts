@@ -31,7 +31,7 @@ import { ResetPasswordGuard } from '@/auth/guards/reset-password.guard';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
 import { AuthProvider } from '@/auth/types/auth.types';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
-import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
+import { ForgotPasswordDto } from '@/infrastructure/email/dto/forgot-password.dto';
 
 import {
   SignUpDocs,

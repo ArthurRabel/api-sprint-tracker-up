@@ -14,7 +14,7 @@ import * as argon2 from 'argon2';
 import { Client } from 'ldapts';
 
 import { ChangePasswordDto, SignInDto, SignUpDto, VerifyResetCodeDto } from '@/auth/dto';
-import { ForgotPasswordDto } from '@/email/dto/forgot-password.dto';
+import { ForgotPasswordDto } from '@/infrastructure/email/dto/forgot-password.dto';
 import { UserService } from '@/user/user.service';
 
 import { AuthRepository } from './auth.repository';

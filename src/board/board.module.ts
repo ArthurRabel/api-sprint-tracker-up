@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 
-import { PrismaModule } from '@/prisma/prisma.module';
+import { PrismaModule } from '@/infrastructure/prisma/prisma.module';
 
 import { BoardController } from './board.controller';
 import { BoardRepository } from './board.repository';

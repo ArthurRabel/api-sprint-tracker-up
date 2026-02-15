@@ -2,10 +2,10 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { EmailService } from '@/email/email.service';
+import { EmailService } from '@/infrastructure/email/email.service';
 
-import { EmailListener } from './listeners/email.listener';
 import { EmailProcessor } from './email.processor';
+import { EmailListener } from './listeners/email.listener';
 import { EmailTransporterProvider } from './transporters/email.transporter.provider';
 
 @Module({

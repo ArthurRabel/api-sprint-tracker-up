@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { endOfDay } from 'date-fns';
 
 import { Status } from '@/common/enums/task-status.enum';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 import { Task, TaskOverdue, TaskWithListBoardId } from './types/task.types';
 
