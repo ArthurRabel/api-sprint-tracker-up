@@ -27,6 +27,7 @@ import {
 } from '@/auth/dto';
 import { IsEnabledAuthGuard } from '@/auth/guards/is-enable-oauth.guard';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
+import { LdapEnabledGuard } from '@/auth/guards/ldap-enabled.guard';
 import { ResetPasswordGuard } from '@/auth/guards/reset-password.guard';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
 import { AuthProvider } from '@/auth/types/auth.types';
@@ -253,6 +254,7 @@ export class AuthController {
   }
 
   @LdapLoginDocs()
+  @UseGuards(LdapEnabledGuard)
   @HttpCode(HttpStatus.OK)
   @Post('signin-ldap')
   async ldapLogin(

@@ -25,10 +25,11 @@ import type { SearchOptions } from 'ldapts';
 
 @Injectable()
 export class AuthService {
-  private readonly userBaseDn: string;
-  private readonly ldapUrl: string;
-  private readonly ldapAdminDn: string;
-  private readonly ldapAdminPassword: string;
+  private readonly isLdapEnabled: boolean;
+  private readonly userBaseDn?: string;
+  private readonly ldapUrl?: string;
+  private readonly ldapAdminDn?: string;
+  private readonly ldapAdminPassword?: string;
   private readonly jwtResetSecret: string;
 
   constructor(
@@ -38,10 +39,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly userService: UserService,
   ) {
-    this.userBaseDn = this.configService.getOrThrow<string>('LDAP_USER_BASE_DN');
-    this.ldapUrl = this.configService.getOrThrow<string>('LDAP_URL');
-    this.ldapAdminDn = this.configService.getOrThrow<string>('LDAP_ADMIN_DN');
-    this.ldapAdminPassword = this.configService.getOrThrow<string>('LDAP_ADMIN_PASSWORD');
+    this.isLdapEnabled = this.configService.get<string>('ENABLE_LDAP_OAUTH') === 'true';
+
+    if (this.isLdapEnabled) {
+      this.userBaseDn = this.configService.getOrThrow<string>('LDAP_USER_BASE_DN');
+      this.ldapUrl = this.configService.getOrThrow<string>('LDAP_URL');
+      this.ldapAdminDn = this.configService.getOrThrow<string>('LDAP_ADMIN_DN');
+      this.ldapAdminPassword = this.configService.getOrThrow<string>('LDAP_ADMIN_PASSWORD');
+    }
+
     this.jwtResetSecret = this.configService.getOrThrow<string>('JWT_RESET_SECRET');
   }
 
@@ -241,11 +247,19 @@ export class AuthService {
     displayName: string;
     mail: string;
   }> {
+    if (!this.isLdapEnabled) {
+      throw new InternalServerErrorException('LDAP authentication is not enabled.');
+    }
+
     const cleanPassword = password.trim();
 
     const userDN = await this.findUserDn(enrollment);
     if (!userDN) {
       throw new UnauthorizedException('User not found in LDAP directory.');
+    }
+
+    if (!this.ldapUrl) {
+      throw new InternalServerErrorException('LDAP URL is not configured.');
     }
 
     const userClient = new Client({
@@ -278,6 +292,10 @@ export class AuthService {
   }
 
   private async getBoundAdminClient(): Promise<Client> {
+    if (!this.ldapUrl || !this.ldapAdminDn || !this.ldapAdminPassword) {
+      throw new InternalServerErrorException('LDAP configuration is incomplete.');
+    }
+
     const client = new Client({
       url: this.ldapUrl,
     });
@@ -287,6 +305,10 @@ export class AuthService {
   }
 
   private async findUserDn(enrollment: string): Promise<string | null> {
+    if (!this.userBaseDn) {
+      throw new InternalServerErrorException('LDAP User Base DN is not configured.');
+    }
+
     const adminClient = await this.getBoundAdminClient();
 
     try {

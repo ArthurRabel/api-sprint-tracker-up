@@ -67,6 +67,12 @@ describe('AuthService', () => {
     userService = module.get(UserService);
 
     configService.getOrThrow.mockReturnValue('mock-value');
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'ENABLE_LDAP_OAUTH') {
+        return 'false';
+      }
+      return 'mock-value';
+    });
     jwtService.sign.mockReturnValue(mockAccessToken);
 
     jest.clearAllMocks();
