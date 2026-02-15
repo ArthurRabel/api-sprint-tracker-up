@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { AuthProvider, Role, User } from '@/common/interfaces';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InviteNotification } from './types/user.types';

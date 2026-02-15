@@ -16,8 +16,8 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CurrentUser } from '@/auth/strategy/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/interfaces/user.interface';
 
-import { importFromTrelloDocs } from './imports.docs';
-import { ImportsService } from './imports.service';
+import { importFromTrelloDocs } from './trello.docs';
+import { TrelloService } from './trello.service';
 import { JsonFileValidator } from './validators/json-file.validator';
 
 @Throttle({
@@ -28,8 +28,8 @@ import { JsonFileValidator } from './validators/json-file.validator';
 @ApiTags('Imports')
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'imports', version: '1' })
-export class ImportsController {
-  constructor(private readonly importsService: ImportsService) {}
+export class TrelloController {
+  constructor(private readonly TrelloService: TrelloService) {}
 
   @importFromTrelloDocs()
   @UseGuards(JwtAuthGuard)
@@ -50,7 +50,7 @@ export class ImportsController {
     )
     file: Express.Multer.File,
   ) {
-    await this.importsService.importFromTrello(user.id, boardId, file);
+    await this.TrelloService.importFromTrello(user.id, boardId, file);
 
     return 'Import started';
   }

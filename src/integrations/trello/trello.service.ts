@@ -5,12 +5,12 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 
-import { StorageService } from '@/storage/storage.service';
+import { AwsS3Service } from '@/infrastructure/awsS3/awsS3.service';
 
 @Injectable()
-export class ImportsService {
+export class TrelloService {
   constructor(
-    private readonly storageService: StorageService,
+    private readonly AwsS3Service: AwsS3Service,
     private readonly configService: ConfigService,
     @InjectQueue('import-queue') private importQueue: Queue,
   ) {}
@@ -19,7 +19,7 @@ export class ImportsService {
     const fileStream = Readable.from(file.buffer);
     const bucket = this.configService.get<string>('S3_BUCKET_NAME') || 'default-bucket';
 
-    await this.storageService.uploadFile(bucket, fileKey, fileStream, file.mimetype);
+    await this.AwsS3Service.uploadFile(bucket, fileKey, fileStream, file.mimetype);
 
     await this.importQueue.add('process-json-job', {
       fileKey: fileKey,

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { PrismaModule } from '@/infrastructure/prisma/prisma.module';
 import { ListService } from '@/list/list.service';
-import { PrismaModule } from '@/prisma/prisma.module';
 
 import { ListController } from './list.controller';
 import { ListRepository } from './list.repository';

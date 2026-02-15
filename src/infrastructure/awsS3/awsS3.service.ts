@@ -6,7 +6,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class StorageService {
+export class AwsS3Service {
   private client: S3Client;
 
   constructor(private configService: ConfigService) {
