@@ -1,5 +1,11 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiNotFoundResponse } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiNotFoundResponse,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 
 export function GetUserDocs() {
   return applyDecorators(
@@ -54,5 +60,37 @@ export function GetNotificationsDocs() {
       description: 'Notifications loaded successfully',
     }),
     ApiNotFoundResponse({ description: 'User not found' }),
+  );
+}
+
+export function UploadAvatarDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Upload profile picture',
+      description:
+        'Uploads an image file as the authenticated user profile picture. Stores the file in AWS S3 and saves the path in the database.',
+    }),
+    ApiConsumes('multipart/form-data'),
+    ApiBody({
+      schema: {
+        type: 'object',
+        required: ['file'],
+        properties: {
+          file: {
+            type: 'string',
+            format: 'binary',
+            description: 'Image file (jpeg, png, webp)',
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Avatar uploaded successfully',
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: 'No file provided or invalid file type',
+    }),
   );
 }

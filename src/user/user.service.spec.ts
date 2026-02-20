@@ -1,9 +1,17 @@
-import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
+jest.mock('sharp', () => {
+  const mockToBuffer = jest.fn().mockResolvedValue(Buffer.from('fake-webp'));
+  const mockWebp = jest.fn().mockReturnValue({ toBuffer: mockToBuffer });
+  return jest.fn().mockReturnValue({ webp: mockWebp });
+});
+
 import { AuthProvider, Role, User } from '@/common/interfaces';
+import { AwsS3Service } from '@/infrastructure/awsS3/awsS3.service';
 
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InviteNotification } from './types/user.types';
@@ -14,6 +22,8 @@ describe('UserService', () => {
   let service: UserService;
   let repository: DeepMockProxy<UserRepository>;
   let eventEmitter: DeepMockProxy<EventEmitter2>;
+  let awsS3Service: DeepMockProxy<AwsS3Service>;
+  let configService: DeepMockProxy<ConfigService>;
 
   const mockUserId = '6217183c-bc01-4bca-8aa0-271b7f9761c5';
 
@@ -38,12 +48,22 @@ describe('UserService', () => {
   beforeEach(async () => {
     repository = mockDeep<UserRepository>();
     eventEmitter = mockDeep<EventEmitter2>();
+    awsS3Service = mockDeep<AwsS3Service>();
+    configService = mockDeep<ConfigService>();
+
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'S3_BUCKET_NAME') return 'test-bucket';
+      if (key === 'CDN_BASE_URL') return 'https://cdn.example.com';
+      return undefined;
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
         { provide: UserRepository, useValue: repository },
         { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: AwsS3Service, useValue: awsS3Service },
+        { provide: ConfigService, useValue: configService },
       ],
     }).compile();
 
@@ -121,7 +141,7 @@ describe('UserService', () => {
   });
 
   describe('getUser', () => {
-    it('should return user data when user exists', async () => {
+    it('should return user data with null image when user has no image', async () => {
       const mockUser = createMockUser();
       repository.findUserById.mockResolvedValue(mockUser);
 
@@ -134,7 +154,18 @@ describe('UserService', () => {
         userName: mockUser.userName,
         email: mockUser.email,
         authProvider: mockUser.authProvider,
+        image: null,
       });
+    });
+
+    it('should return full CDN URL when user has an image', async () => {
+      const imageKey = 'users/avatars/some-id/123-avatar.webp';
+      const mockUser = createMockUser({ image: imageKey });
+      repository.findUserById.mockResolvedValue(mockUser);
+
+      const result = await service.getUser(mockUserId);
+
+      expect(result.image).toBe(`https://cdn.example.com/${imageKey}`);
     });
 
     it('should throw NotFoundException when user does not exist', async () => {
@@ -228,6 +259,60 @@ describe('UserService', () => {
 
       expect(repository.findUserInvites).toHaveBeenCalledWith(mockUserId);
       expect(result).toEqual(mockNotifications);
+    });
+  });
+
+  describe('uploadAvatar', () => {
+    const buildFile = (overrides: Partial<Express.Multer.File> = {}): Express.Multer.File => ({
+      fieldname: 'file',
+      originalname: 'photo.jpg',
+      encoding: '7bit',
+      mimetype: 'image/jpeg',
+      buffer: Buffer.from('fake-image-data'),
+      size: 1024,
+      stream: null as never,
+      destination: '',
+      filename: '',
+      path: '',
+      ...overrides,
+    });
+
+    it('should upload, persist the new key, and NOT delete when no previous image', async () => {
+      const mockUser = createMockUser({ image: null });
+      repository.findUserById.mockResolvedValue(mockUser);
+      awsS3Service.uploadFile.mockResolvedValue(undefined as never);
+      repository.updateUserAvatar.mockResolvedValue(undefined);
+
+      const result = await service.uploadAvatar(mockUserId, buildFile());
+
+      expect(awsS3Service.uploadFile).toHaveBeenCalledTimes(1);
+      expect(repository.updateUserAvatar).toHaveBeenCalledWith(
+        mockUserId,
+        expect.stringMatching(/^users\/avatars\/.+\.webp$/),
+      );
+      expect(awsS3Service.deleteFile).not.toHaveBeenCalled();
+      expect(result.imagePath).toMatch(/^https:\/\/cdn\.example\.com\/users\/avatars\/.+\.webp$/);
+    });
+
+    it('should delete the old key after uploading a new image', async () => {
+      const oldKey = 'users/avatars/old-user/123-avatar.webp';
+      const mockUser = createMockUser({ image: oldKey });
+      repository.findUserById.mockResolvedValue(mockUser);
+      awsS3Service.uploadFile.mockResolvedValue(undefined as never);
+      awsS3Service.deleteFile.mockResolvedValue(undefined);
+      repository.updateUserAvatar.mockResolvedValue(undefined);
+
+      await service.uploadAvatar(mockUserId, buildFile());
+
+      expect(awsS3Service.deleteFile).toHaveBeenCalledWith('test-bucket', oldKey);
+    });
+
+    it('should throw BadRequestException for invalid MIME type', async () => {
+      const file = buildFile({ mimetype: 'application/pdf' });
+
+      await expect(service.uploadAvatar(mockUserId, file)).rejects.toThrow(BadRequestException);
+      expect(repository.findUserById).not.toHaveBeenCalled();
+      expect(awsS3Service.uploadFile).not.toHaveBeenCalled();
     });
   });
 });

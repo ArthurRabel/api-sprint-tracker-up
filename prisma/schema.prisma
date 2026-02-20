@@ -14,15 +14,16 @@ model User {
   userName            String         @unique
   providerId          String?
   authProvider        AuthProvider
-  CreatedAt           DateTime       @default(now())
-  isVerified          Boolean        @default(false)
   name                String
   passwordHash        String?
+  image               String?
+  role                Role
   resetToken          String?
   resetTokenExpiresAt DateTime?
-  role                Role
+  isVerified          Boolean        @default(false)
+  createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
-  image               String?
+  deletedAt           DateTime?
   boards              Board[]        @relation("OwnerBoards")
   memberships         BoardMember[]
   tasksCreated        Task[]         @relation("TaskCreator")

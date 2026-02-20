@@ -23,15 +23,16 @@ CREATE TABLE "public"."User" (
     "userName" TEXT NOT NULL,
     "providerId" TEXT,
     "authProvider" "public"."AuthProvider" NOT NULL,
-    "CreatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "isVerified" BOOLEAN NOT NULL DEFAULT false,
     "name" TEXT NOT NULL,
     "passwordHash" TEXT,
+    "image" TEXT,
+    "role" "public"."Role" NOT NULL,
     "resetToken" TEXT,
     "resetTokenExpiresAt" TIMESTAMP(3),
-    "role" "public"."Role" NOT NULL,
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "image" TEXT,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
