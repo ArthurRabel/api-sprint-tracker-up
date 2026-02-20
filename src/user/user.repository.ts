@@ -51,6 +51,13 @@ export class UserRepository {
     });
   }
 
+  async updateUserAvatar(userId: string, imagePath: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { image: imagePath },
+    });
+  }
+
   async findUserInvites(userId: string): Promise<InviteNotification[]> {
     const notifications = await this.prisma.invite.findMany({
       where: { recipientId: userId },

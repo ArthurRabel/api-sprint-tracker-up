@@ -30,6 +30,7 @@ export class AuthService {
   private readonly ldapUrl?: string;
   private readonly ldapAdminDn?: string;
   private readonly ldapAdminPassword?: string;
+  private readonly baseCdnUrl: string;
   private readonly jwtResetSecret: string;
 
   constructor(
@@ -48,15 +49,18 @@ export class AuthService {
       this.ldapAdminPassword = this.configService.getOrThrow<string>('LDAP_ADMIN_PASSWORD');
     }
 
+    this.baseCdnUrl = this.configService.get<string>('CDN_BASE_URL') || '';
     this.jwtResetSecret = this.configService.getOrThrow<string>('JWT_RESET_SECRET');
   }
 
   private generateJwt(user: User, rememberMe = false): { accessToken: string } {
+    const imageUrl = user.image ? this.baseCdnUrl + '/' + user.image : null;
     const payload: AccessTokenPayload = {
       sub: user.id,
       email: user.email,
       name: user.name,
       userName: user.userName,
+      image: imageUrl,
     };
     return {
       accessToken: this.jwtService.sign(payload, {

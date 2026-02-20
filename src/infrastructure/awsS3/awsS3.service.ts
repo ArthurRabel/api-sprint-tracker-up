@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
 
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -33,6 +33,11 @@ export class AwsS3Service {
     });
 
     return upload.done();
+  }
+
+  async deleteFile(bucket: string, key: string): Promise<void> {
+    const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
+    await this.client.send(command);
   }
 
   async getFileStream(bucket: string, key: string) {

@@ -37,6 +37,7 @@
     "@nestjs/websockets": "^11.1.6",
     "@prisma/client": "^6.5.0",
     "@scalar/nestjs-api-reference": "1.0.17",
+    "@types/sharp": "^0.31.1",
     "argon2": "^0.41.1",
     "bullmq": "^5.66.4",
     "class-transformer": "^0.5.1",
@@ -57,6 +58,7 @@
     "passport-microsoft": "^2.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.5",
     "stream-json": "^1.9.1"
   },
   "devDependencies": {

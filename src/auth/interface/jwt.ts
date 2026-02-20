@@ -3,6 +3,7 @@ export interface AccessTokenPayload {
   email: string;
   name: string;
   userName: string;
+  image: string | null;
 
   iat?: number;
   exp?: number;
