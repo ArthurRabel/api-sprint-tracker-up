@@ -36,7 +36,7 @@ describe('UserService', () => {
     providerId: null,
     role: Role.MEMBER,
     authProvider: AuthProvider.LOCAL,
-    CreatedAt: new Date(),
+    createdAt: new Date(),
     isVerified: false,
     updatedAt: new Date(),
     resetToken: null,
