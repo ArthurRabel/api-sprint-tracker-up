@@ -17,7 +17,7 @@ export interface User {
   userName: string;
   providerId: string | null;
   authProvider: AuthProvider;
-  CreatedAt: Date;
+  createdAt: Date;
   isVerified: boolean;
   name: string;
   passwordHash: string | null;

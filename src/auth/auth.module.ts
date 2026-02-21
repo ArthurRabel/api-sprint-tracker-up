@@ -1,6 +1,6 @@
 import { DynamicModule, Module, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 import { AuthController } from '@/auth/auth.controller';
@@ -28,7 +28,7 @@ function createOauthStrategies(configService: ConfigService) {
   return strategies;
 }
 
-function getJwtConfig(configService: ConfigService) {
+function getJwtConfig(configService: ConfigService): JwtModuleOptions {
   return {
     secret: configService.getOrThrow<string>('JWT_SECRET'),
     signOptions: { expiresIn: '1d' },
