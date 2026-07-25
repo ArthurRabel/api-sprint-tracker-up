@@ -57,7 +57,7 @@
     "passport-microsoft": "^2.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.0",
     "stream-json": "^1.9.1"
   },
   "devDependencies": {
